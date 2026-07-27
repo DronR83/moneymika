@@ -19,19 +19,42 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;height:100%;background:var(--ink);color:var(--txt);font-family:var(--sans);overscroll-behavior:none;}
 body{background-image:radial-gradient(ellipse 900px 500px at 50% -10%, rgba(201,163,76,.08), transparent 60%);}
-#app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
-#content{flex:1;padding:20px 18px 100px;overflow-y:auto;}
 
-/* --- Typographie --- */
+/* --- Cadre app, centré et responsive --- */
+#shell{min-height:100vh;display:flex;justify-content:center;align-items:stretch;}
+#app{width:100%;max-width:480px;min-height:100vh;display:flex;flex-direction:column;position:relative;
+  background:var(--ink);}
+@media (min-width:720px){
+  body{background:
+    radial-gradient(ellipse 1200px 800px at 50% 0%, rgba(201,163,76,.10), transparent 60%),
+    var(--ink);}
+  #shell{padding:40px 0;align-items:flex-start;justify-content:center;}
+  #app{min-height:860px;border-radius:32px;border:1px solid var(--line);
+    box-shadow:0 40px 100px rgba(0,0,0,.55), 0 0 0 1px rgba(201,163,76,.06);overflow:hidden;}
+}
+
+#content{flex:1;padding:20px 18px 110px;overflow-y:auto;}
+
 h2.pagehead{font-family:var(--serif);font-size:24px;font-weight:400;letter-spacing:.3px;margin:2px 0 18px;color:var(--txt);}
 h3.blocktitle{font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--sub);margin:0 0 14px;}
 .num{font-family:var(--serif);font-variant-numeric:tabular-nums;}
 
+/* --- Sélecteur de mois --- */
+.month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:6px 6px;}
+.month-nav .m-label{font-family:var(--serif);font-size:16px;text-transform:capitalize;flex:1;text-align:center;}
+.month-nav button{background:var(--panel2);border:1px solid var(--line);color:var(--brass-light);
+  width:40px;height:40px;border-radius:12px;font-size:18px;transition:transform .1s ease, background .15s ease;}
+.month-nav button:active{transform:scale(.88);background:var(--line);}
+
 /* --- Cartes chiffres --- */
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;}
-.card{background:linear-gradient(160deg, var(--panel2), var(--panel));border:1px solid var(--line);border-radius:16px;padding:14px 16px;position:relative;overflow:hidden;}
+.card{background:linear-gradient(160deg, var(--panel2), var(--panel));border:1px solid var(--line);border-radius:16px;padding:14px 16px;position:relative;overflow:hidden;
+  transition:transform .15s ease;}
 .card::before{content:'';position:absolute;top:-40%;right:-30%;width:120px;height:120px;border-radius:50%;
   background:radial-gradient(circle, rgba(201,163,76,.10), transparent 70%);}
+.card.clickable{cursor:pointer;}
+.card.clickable:active{transform:scale(.96);}
 .card .lbl{font-size:10.5px;color:var(--sub);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px;}
 .card .val{font-family:var(--serif);font-size:20px;font-weight:400;}
 .pos{color:var(--green);} .neg{color:var(--red);}
@@ -43,51 +66,79 @@ h3.blocktitle{font-family:var(--sans);font-size:11px;font-weight:600;letter-spac
 
 /* --- Champs --- */
 input,select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
-  padding:11px 12px;border-radius:12px;font-size:14px;width:100%;font-family:var(--sans);
+  padding:13px 14px;border-radius:12px;font-size:15px;width:100%;font-family:var(--sans);
   transition:border-color .15s ease, box-shadow .15s ease;}
 input:focus,select:focus{outline:none;border-color:var(--brass);box-shadow:0 0 0 3px rgba(201,163,76,.15);}
-.row{display:flex;gap:8px;margin-bottom:8px;}
+.row{display:flex;gap:8px;margin-bottom:10px;}
 .row > *{flex:1;}
 .small{font-size:11.5px;color:var(--sub);}
 
-/* --- Boutons avec relief 3D sobre --- */
+/* --- Boutons --- */
 button.btn{
-  cursor:pointer;font-weight:600;font-size:14px;width:100%;border:none;border-radius:12px;
-  padding:12px;color:var(--txt);background:var(--panel2);border:1px solid var(--line);
-  transform:translateY(0);box-shadow:0 2px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.15);
+  cursor:pointer;font-weight:600;font-size:15px;width:100%;border:none;border-radius:14px;
+  padding:15px;color:var(--txt);background:var(--panel2);border:1px solid var(--line);
+  transform:translateY(0);box-shadow:0 3px 0 rgba(0,0,0,.35), 0 8px 16px rgba(0,0,0,.15);
   transition:transform .08s ease, box-shadow .08s ease, background .15s ease;
 }
-button.btn:active{transform:translateY(2px);box-shadow:0 0 0 rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.15);}
+button.btn:active{transform:translateY(3px);box-shadow:0 0 0 rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.15);}
 button.btn.primary{
   background:linear-gradient(160deg, var(--brass-light), var(--brass) 55%, var(--brass-dark));
-  color:#1a1305;border:none;box-shadow:0 2px 0 rgba(90,65,10,.6), 0 8px 18px rgba(201,163,76,.22);
+  color:#1a1305;border:none;box-shadow:0 3px 0 rgba(90,65,10,.6), 0 10px 22px rgba(201,163,76,.25);
 }
 button.btn.primary:active{box-shadow:0 0 0 rgba(90,65,10,.6), 0 3px 8px rgba(201,163,76,.18);}
-button.btn.danger{width:auto;padding:7px 12px;font-size:12px;background:rgba(255,107,107,.1);color:var(--red);border:1px solid rgba(255,107,107,.25);
+button.btn.danger{width:auto;padding:8px 14px;font-size:12px;background:rgba(255,107,107,.1);color:var(--red);border:1px solid rgba(255,107,107,.25);
   box-shadow:none;}
 button.btn.danger:active{transform:scale(.94);}
 button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:none;}
 
+/* --- Bouton flottant + --- */
+#fab{position:absolute;right:20px;bottom:96px;width:64px;height:64px;border-radius:50%;
+  background:linear-gradient(160deg, var(--brass-light), var(--brass) 55%, var(--brass-dark));
+  border:none;color:#1a1305;font-size:30px;font-weight:600;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 0 rgba(90,65,10,.6), 0 14px 30px rgba(201,163,76,.35);
+  transition:transform .12s cubic-bezier(.34,1.56,.64,1), box-shadow .12s ease;
+  z-index:40;line-height:0;}
+#fab:active{transform:translateY(4px) scale(.92) rotate(90deg);box-shadow:0 0 0 rgba(90,65,10,.6), 0 4px 10px rgba(201,163,76,.25);}
+
+/* --- Modale rapide --- */
+#quickOverlay{position:fixed;inset:0;background:rgba(4,5,8,.72);backdrop-filter:blur(4px);
+  display:none;align-items:flex-end;justify-content:center;z-index:80;}
+#quickOverlay.open{display:flex;}
+#quickSheet{width:100%;max-width:480px;background:var(--panel);border-radius:24px 24px 0 0;
+  padding:22px 18px 28px;border:1px solid var(--line);border-bottom:none;
+  animation:slideUp .22s cubic-bezier(.2,.8,.3,1);}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+#quickSheet .handle{width:40px;height:4px;background:var(--line);border-radius:4px;margin:0 auto 16px;}
+.seg{display:flex;background:var(--panel2);border-radius:12px;padding:4px;margin-bottom:10px;}
+.seg button{flex:1;background:none;border:none;color:var(--sub);padding:10px;border-radius:9px;font-weight:600;font-size:13px;
+  transition:all .15s ease;box-shadow:none;}
+.seg button.active.out{background:rgba(255,107,107,.15);color:var(--red);}
+.seg button.active.in{background:rgba(61,220,132,.15);color:var(--green);}
+
 /* --- Listes --- */
-.list-item{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line-soft);}
+.list-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line-soft);}
 .list-item:last-child{border-bottom:none;}
-.item-main{font-size:13.5px;font-weight:500;}
+.item-main{font-size:14px;font-weight:500;}
 .item-sub{font-size:11px;color:var(--sub);margin-top:2px;}
 .tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;background:rgba(201,163,76,.12);color:var(--brass-light);}
 .dot-bar{background:var(--line-soft);border-radius:6px;width:70px;height:6px;overflow:hidden;}
 .dot-fill{height:6px;border-radius:6px;transition:width .3s ease;}
+.check{width:24px;height:24px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel2);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s ease;cursor:pointer;}
+.check.on{background:var(--brass);border-color:var(--brass);}
+.check.on::after{content:'✓';color:#1a1305;font-size:14px;font-weight:700;}
 
 /* --- Navigation --- */
-#nav{display:flex;background:rgba(18,21,28,.92);backdrop-filter:blur(14px);border-top:1px solid var(--line);
-  position:sticky;bottom:0;max-width:480px;margin:0 auto;width:100%;padding:6px 4px 8px;}
-#nav button{flex:1;background:none;border:none;color:var(--sub);padding:8px 2px 4px;font-size:10px;font-weight:500;
-  border-radius:12px;transition:color .2s ease, transform .1s ease;position:relative;}
-#nav button:active{transform:scale(.92);}
+#nav{display:flex;background:rgba(18,21,28,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line);
+  position:sticky;bottom:0;width:100%;padding:8px 4px 10px;z-index:30;}
+#nav button{flex:1;background:none;border:none;color:var(--sub);padding:9px 2px 4px;font-size:10.5px;font-weight:500;
+  border-radius:12px;transition:color .2s ease, transform .1s ease;position:relative;box-shadow:none;}
+#nav button:active{transform:scale(.9);}
 #nav button.active{color:var(--brass-light);}
 #nav button.active::after{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:4px;height:4px;
   border-radius:50%;background:var(--brass-light);}
-#nav .ic{font-size:19px;display:block;margin-bottom:3px;filter:grayscale(1) opacity(.7);}
-#nav button.active .ic{filter:none;}
+#nav .ic{font-size:21px;display:block;margin-bottom:3px;filter:grayscale(1) opacity(.7);}
+#nav button.active .ic{filter:none;transform:scale(1.08);}
 
 /* --- Ecran de verrouillage --- */
 #lock{position:fixed;inset:0;background:radial-gradient(ellipse 700px 500px at 50% 20%, rgba(201,163,76,.1), var(--ink) 65%);
@@ -109,7 +160,7 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
 #lockMsg{color:var(--red);font-size:12px;height:16px;margin-bottom:6px;}
 #dropzone{border:2px dashed var(--line);border-radius:14px;padding:26px;text-align:center;color:var(--sub);font-size:13px;}
 
-@media (prefers-reduced-motion: reduce){ *{transition:none!important;} }
+@media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important;} }
 </style>
 </head>
 <body>
@@ -126,8 +177,12 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
   <div id="pad"></div>
 </div>
 
+<div id="shell">
 <div id="app" style="display:none;">
   <div id="content"></div>
+
+  <div id="fab" onclick="openQuick()">+</div>
+
   <div id="nav">
     <button data-v="dash"><span class="ic">◈</span>Accueil</button>
     <button data-v="tx"><span class="ic">✦</span>Mouvements</button>
@@ -136,24 +191,59 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
     <button data-v="io"><span class="ic">⚙</span>Réglages</button>
   </div>
 </div>
+</div>
+
+<!-- Modale ajout rapide -->
+<div id="quickOverlay" onclick="if(event.target===this) closeQuick()">
+  <div id="quickSheet">
+    <div class="handle"></div>
+    <div class="seg">
+      <button id="segOut" class="active out" onclick="setQuickType('out')">Dépense</button>
+      <button id="segIn" class="in" onclick="setQuickType('in')">Revenu</button>
+    </div>
+    <div class="row"><input type="date" id="qDate"><select id="qAcc"></select></div>
+    <div class="row"><select id="qCat"></select><input id="qAmount" type="number" step="0.01" placeholder="Montant €"></div>
+    <div class="row"><input id="qNote" placeholder="Note (optionnel)"></div>
+    <button class="btn primary" onclick="quickAdd()">Ajouter</button>
+  </div>
+</div>
+
+<!-- Modale carte différée -->
+<div id="cardOverlay" onclick="if(event.target===this) closeCardModal()">
+  <div id="cardSheet" style="display:none;">
+  </div>
+</div>
 
 <script>
 /* ======== TOUT RESTE SUR CE TELEPHONE. AUCUN RESEAU. AUCUN SERVEUR. ======== */
 
-const STORE_KEY = "moneymika_data_v1";
+const STORE_KEY = "moneymika_data_v2";
 const PIN_KEY = "moneymika_pin_v1";
 
 let DATA = load() || {
   accounts:[{id:1,name:"Compte courant",balance:0}],
   categories:["Salaire","Loyer","Courses","Transport","Loisirs","Santé","Autre"],
   transactions:[],
-  recurring:[],
+  recurring:[], // {id,label,type,accountId,category,amount,dayOfMonth,deferred(bool par defaut)}
+  cardDefer:{}, // { "2026-08": [recId, recId] }  -> ces items sont reportés au mois suivant pour CE mois choisi
   nextTxId:1, nextAccId:2, nextRecId:1
 };
+if(!DATA.cardDefer) DATA.cardDefer={};
 let VIEW="dash";
+let currentMonth = todayStr().slice(0,7);
+let cardModalMonth = todayStr().slice(0,7);
 
 function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(DATA)); }
-function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)); }catch(e){ return null; } }
+function load(){
+  try{
+    let v2 = JSON.parse(localStorage.getItem(STORE_KEY));
+    if(v2) return v2;
+    // migration depuis ancienne version
+    let v1 = JSON.parse(localStorage.getItem("moneymika_data_v1"));
+    if(v1){ if(!v1.cardDefer) v1.cardDefer={}; return v1; }
+    return null;
+  }catch(e){ return null; }
+}
 
 // ---------- VERROUILLAGE PAR CODE ----------
 let pinBuffer="";
@@ -194,20 +284,11 @@ function pressKey(n){
       if(pinMode==="create"){
         pinTemp=pinBuffer; pinBuffer=""; pinMode="confirm"; renderPad();
       } else if(pinMode==="confirm"){
-        if(pinBuffer===pinTemp){
-          localStorage.setItem(PIN_KEY, pinBuffer);
-          unlock();
-        } else {
-          document.getElementById('lockMsg').textContent="Les codes ne correspondent pas.";
-          pinBuffer=""; pinMode="create"; renderPad();
-        }
+        if(pinBuffer===pinTemp){ localStorage.setItem(PIN_KEY, pinBuffer); unlock(); }
+        else { document.getElementById('lockMsg').textContent="Les codes ne correspondent pas."; pinBuffer=""; pinMode="create"; renderPad(); }
       } else {
-        if(pinBuffer===localStorage.getItem(PIN_KEY)){
-          unlock();
-        } else {
-          document.getElementById('lockMsg').textContent="Code incorrect.";
-          pinBuffer=""; updateDots();
-        }
+        if(pinBuffer===localStorage.getItem(PIN_KEY)){ unlock(); }
+        else { document.getElementById('lockMsg').textContent="Code incorrect."; pinBuffer=""; updateDots(); }
       }
     },100);
   }
@@ -229,6 +310,32 @@ function computeBalance(accId){
   return bal;
 }
 function totalBalance(){ return DATA.accounts.reduce((s,a)=>s+computeBalance(a.id),0); }
+function monthLabel(mk){
+  let [y,m]=mk.split('-').map(Number);
+  let d=new Date(y,m-1,1);
+  return d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+}
+function shiftMonth(mk,delta){
+  let [y,m]=mk.split('-').map(Number);
+  let d=new Date(y,m-1+delta,1);
+  return d.toISOString().slice(0,7);
+}
+function nextMonthKey(mk){ return shiftMonth(mk,1); }
+
+// Renvoie {in, out} récurrent effectif pour un mois donné, en tenant compte du report carte différée
+function recurringForMonth(mk){
+  let prevMk = shiftMonth(mk,-1);
+  let deferredThisMonth = DATA.cardDefer[mk] || [];
+  let deferredFromPrev = DATA.cardDefer[prevMk] || [];
+  let inSum=0, outSum=0;
+  DATA.recurring.forEach(r=>{
+    let excludedThisMonth = deferredThisMonth.includes(r.id);
+    let addedFromPrev = deferredFromPrev.includes(r.id);
+    if(!excludedThisMonth){ if(r.type==='in') inSum+=r.amount; else outSum+=r.amount; }
+    if(addedFromPrev){ if(r.type==='in') inSum+=r.amount; else outSum+=r.amount; }
+  });
+  return {inSum, outSum};
+}
 
 // ---------- RENDU PRINCIPAL ----------
 function render(){
@@ -243,42 +350,44 @@ function render(){
 }
 
 function renderDash(){
-  let mois=todayStr().slice(0,7);
-  let txMois=DATA.transactions.filter(t=>t.date.slice(0,7)===mois);
+  let txMois=DATA.transactions.filter(t=>t.date.slice(0,7)===currentMonth);
   let inMois=txMois.filter(t=>t.type==='in').reduce((s,t)=>s+t.amount,0);
   let outMois=txMois.filter(t=>t.type==='out').reduce((s,t)=>s+t.amount,0);
-  let recent=[...DATA.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  let rec = recurringForMonth(currentMonth);
+  let recent=[...txMois].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  let deferredList = DATA.cardDefer[currentMonth] || [];
+  let deferredAmount = DATA.recurring.filter(r=>deferredList.includes(r.id) && r.type==='out').reduce((s,r)=>s+r.amount,0);
   return `
-  <h2 class="pagehead">Bonjour</h2>
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">‹</button>
+    <div class="m-label">${monthLabel(currentMonth)}</div>
+    <button onclick="changeMonth(1)">›</button>
+  </div>
   <div class="cards">
     <div class="card"><div class="lbl">Solde total</div><div class="val num accent">${fmt(totalBalance())}</div></div>
-    <div class="card"><div class="lbl">Net ce mois</div><div class="val num ${inMois-outMois>=0?'pos':'neg'}">${fmt(inMois-outMois)}</div></div>
-    <div class="card"><div class="lbl">Entrées</div><div class="val num pos">+${fmt(inMois)}</div></div>
-    <div class="card"><div class="lbl">Sorties</div><div class="val num neg">-${fmt(outMois)}</div></div>
+    <div class="card"><div class="lbl">Net réel du mois</div><div class="val num ${inMois-outMois>=0?'pos':'neg'}">${fmt(inMois-outMois)}</div></div>
+    <div class="card"><div class="lbl">Entrées réelles</div><div class="val num pos">+${fmt(inMois)}</div></div>
+    <div class="card"><div class="lbl">Sorties réelles</div><div class="val num neg">-${fmt(outMois)}</div></div>
+    <div class="card clickable" onclick="openCardModal('${currentMonth}')" style="grid-column:1/3;">
+      <div class="lbl">💳 Carte différée — ${monthLabel(currentMonth)}</div>
+      <div class="val num neg">-${fmt(deferredAmount)} <span class="small" style="font-family:var(--sans);">reportés au mois suivant · appuyer pour gérer</span></div>
+    </div>
   </div>
   <div class="panel">
-    <h3 class="blocktitle">Derniers mouvements</h3>
+    <h3 class="blocktitle">Mouvements du mois</h3>
     ${recent.map(t=>`<div class="list-item"><div><div class="item-main">${t.category} · ${accName(t.accountId)}</div>
       <div class="item-sub">${t.date}${t.note?' — '+t.note:''}</div></div>
       <div class="num ${t.type==='in'?'pos':'neg'}">${t.type==='in'?'+':'-'}${fmt(t.amount)}</div></div>`).join('')
-      || '<div class="small">Rien pour l\'instant.</div>'}
+      || '<div class="small">Rien ce mois-ci.</div>'}
   </div>`;
 }
 
+function changeMonth(delta){ currentMonth = shiftMonth(currentMonth, delta); render(); }
+
 function renderTx(){
-  let accOpts=DATA.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
-  let catOpts=DATA.categories.map(c=>`<option value="${c}">${c}</option>`).join('');
   let list=[...DATA.transactions].sort((a,b)=>b.date.localeCompare(a.date));
   return `
   <h2 class="pagehead">Mouvements</h2>
-  <div class="panel">
-    <h3 class="blocktitle">Ajouter</h3>
-    <div class="row"><input type="date" id="txDate" value="${todayStr()}"><select id="txType"><option value="out">Dépense</option><option value="in">Revenu</option></select></div>
-    <div class="row"><select id="txAcc">${accOpts}</select><select id="txCat">${catOpts}</select></div>
-    <div class="row"><input id="txAmount" type="number" step="0.01" placeholder="Montant"></div>
-    <div class="row"><input id="txNote" placeholder="Note (optionnel)"></div>
-    <button class="btn primary" onclick="addTx()">Ajouter</button>
-  </div>
   <div class="panel">
     <h3 class="blocktitle">Historique · ${list.length}</h3>
     ${list.map(t=>`<div class="list-item"><div><div class="item-main">${t.category} · ${accName(t.accountId)}</div>
@@ -286,7 +395,7 @@ function renderTx(){
       <div style="display:flex;align-items:center;gap:8px;">
       <span class="num ${t.type==='in'?'pos':'neg'}">${t.type==='in'?'+':'-'}${fmt(t.amount)}</span>
       <button class="btn danger" onclick="delTx(${t.id})">✕</button></div></div>`).join('')
-      || '<div class="small">Aucun mouvement.</div>'}
+      || '<div class="small">Aucun mouvement. Utilise le bouton + en bas.</div>'}
   </div>
   <div class="panel">
     <h3 class="blocktitle">Comptes</h3>
@@ -325,28 +434,33 @@ function renderRec(){
     <h3 class="blocktitle">Dépenses récurrentes</h3>
     ${outList.map(r=>`<div class="list-item"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · ${accName(r.accountId)} · le ${r.dayOfMonth}</div></div>
       <div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(r.amount)}</span><button class="btn danger" onclick="delRec(${r.id})">✕</button></div></div>`).join('') || '<div class="small">Aucune.</div>'}
+  </div>
+  <div class="panel">
+    <h3 class="blocktitle">💳 Carte différée</h3>
+    <div class="small" style="margin-bottom:10px;">Coche une dépense pour la reporter au mois suivant (paiement carte à débit différé). Gère ça mois par mois depuis l'accueil, carte "Carte différée".</div>
+    <button class="btn ghost" onclick="openCardModal(currentMonth)">Ouvrir pour ${monthLabel(currentMonth)}</button>
   </div>`;
 }
 
 function renderPrevis(){
   let months=parseInt(window.__previsMonths||48);
   let base=totalBalance();
-  let sumIn=DATA.recurring.filter(r=>r.type==='in').reduce((s,r)=>s+r.amount,0);
-  let sumOut=DATA.recurring.filter(r=>r.type==='out').reduce((s,r)=>s+r.amount,0);
   let rows=[]; let running=base; let cursor=new Date();
   for(let i=0;i<months;i++){
-    if(i>0){ cursor.setMonth(cursor.getMonth()+1); running += sumIn - sumOut; }
-    rows.push({m:cursor.toISOString().slice(0,7), running});
+    let mk = i===0 ? currentMonth : (cursor.setMonth(cursor.getMonth()+1), cursor.toISOString().slice(0,7));
+    let {inSum,outSum} = recurringForMonth(mk);
+    if(i>0) running += inSum - outSum;
+    rows.push({m:mk, running});
   }
   let maxAbs=Math.max(...rows.map(r=>Math.abs(r.running)),1);
   return `
   <h2 class="pagehead">Prévision</h2>
   <div class="panel">
     <div class="row"><input id="previsMonths" type="number" min="1" max="120" value="${months}"><button class="btn primary" onclick="setPrevisMonths()">Recalculer</button></div>
-    <div class="small">Net fixe mensuel : <span class="pos">+${fmt(sumIn)}</span> / <span class="neg">-${fmt(sumOut)}</span> = <span class="accent">${fmt(sumIn-sumOut)}</span>/mois</div>
+    <div class="small">Basé sur tes revenus/dépenses récurrents, en tenant compte des reports carte différée.</div>
   </div>
   <div class="panel">
-    ${rows.map(r=>`<div class="list-item"><div class="item-main">${r.m}</div>
+    ${rows.map(r=>`<div class="list-item"><div class="item-main">${monthLabel(r.m)}</div>
       <div style="display:flex;align-items:center;gap:10px;">
       <div class="dot-bar"><div class="dot-fill" style="background:${r.running>=0?'var(--green)':'var(--red)'};width:${Math.min(100,Math.abs(r.running)/maxAbs*100)}%"></div></div>
       <span class="num ${r.running>=0?'pos':'neg'}">${fmt(r.running)}</span></div></div>`).join('')}
@@ -375,8 +489,78 @@ function renderIO(){
   </div>
   <div class="panel">
     <h3 class="blocktitle">Zone danger</h3>
-    <button class="btn danger" style="width:100%;padding:12px;" onclick="resetAll()">Effacer toutes les données</button>
+    <button class="btn danger" style="width:100%;padding:14px;" onclick="resetAll()">Effacer toutes les données</button>
   </div>`;
+}
+
+// ---------- MODALE AJOUT RAPIDE ----------
+let quickType='out';
+function openQuick(){
+  document.getElementById('qDate').value = currentMonth+'-'+String(new Date().getDate()).padStart(2,'0');
+  document.getElementById('qAcc').innerHTML = DATA.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+  document.getElementById('qCat').innerHTML = DATA.categories.map(c=>`<option value="${c}">${c}</option>`).join('');
+  setQuickType('out');
+  document.getElementById('quickOverlay').classList.add('open');
+}
+function closeQuick(){ document.getElementById('quickOverlay').classList.remove('open'); }
+function setQuickType(t){
+  quickType=t;
+  document.getElementById('segOut').classList.toggle('active', t==='out');
+  document.getElementById('segIn').classList.toggle('active', t==='in');
+}
+function quickAdd(){
+  let date=document.getElementById('qDate').value || todayStr();
+  let accountId=parseInt(document.getElementById('qAcc').value);
+  let category=document.getElementById('qCat').value;
+  let amount=parseFloat(document.getElementById('qAmount').value);
+  let note=document.getElementById('qNote').value;
+  if(!amount) return alert("Montant requis.");
+  DATA.transactions.push({id:DATA.nextTxId++,date,accountId,type:quickType,category,amount,note});
+  save();
+  document.getElementById('qAmount').value=''; document.getElementById('qNote').value='';
+  closeQuick();
+  render();
+}
+
+// ---------- MODALE CARTE DIFFEREE ----------
+function openCardModal(mk){
+  cardModalMonth = mk;
+  const overlay = document.getElementById('cardOverlay');
+  const sheet = document.getElementById('cardSheet');
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(4,5,8,.72);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;z-index:85;";
+  sheet.style.cssText = "display:block;width:100%;max-width:480px;background:var(--panel);border-radius:24px 24px 0 0;padding:22px 18px 28px;border:1px solid var(--line);border-bottom:none;max-height:80vh;overflow-y:auto;";
+  renderCardSheet();
+}
+function closeCardModal(){ document.getElementById('cardOverlay').style.display='none'; }
+function renderCardSheet(){
+  let outList = DATA.recurring.filter(r=>r.type==='out');
+  let deferred = DATA.cardDefer[cardModalMonth] || [];
+  document.getElementById('cardSheet').innerHTML = `
+    <div class="handle"></div>
+    <h3 class="blocktitle">💳 Carte différée</h3>
+    <h2 class="pagehead" style="margin-bottom:6px;">${monthLabel(cardModalMonth)}</h2>
+    <div class="small" style="margin-bottom:14px;">Coche une dépense : elle ne compte plus pour ${monthLabel(cardModalMonth)}, et sera ajoutée à ${monthLabel(nextMonthKey(cardModalMonth))} à la place.</div>
+    <div class="row" style="margin-bottom:14px;">
+      <button class="btn ghost" onclick="openCardModal(shiftMonth(cardModalMonth,-1))">‹ ${monthLabel(shiftMonth(cardModalMonth,-1))}</button>
+      <button class="btn ghost" onclick="openCardModal(shiftMonth(cardModalMonth,1))">${monthLabel(shiftMonth(cardModalMonth,1))} ›</button>
+    </div>
+    ${outList.map(r=>{
+      let on = deferred.includes(r.id);
+      return `<div class="list-item">
+        <div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · -${fmt(r.amount)}</div></div>
+        <div class="check ${on?'on':''}" onclick="toggleDefer(${r.id})"></div>
+      </div>`;
+    }).join('') || '<div class="small">Aucune dépense récurrente. Ajoute-en dans l\'onglet Récurrent.</div>'}
+    <button class="btn primary" style="margin-top:16px;" onclick="closeCardModal(); render();">Fermer</button>
+  `;
+}
+function toggleDefer(recId){
+  if(!DATA.cardDefer[cardModalMonth]) DATA.cardDefer[cardModalMonth]=[];
+  let arr = DATA.cardDefer[cardModalMonth];
+  let idx = arr.indexOf(recId);
+  if(idx>-1) arr.splice(idx,1); else arr.push(recId);
+  save();
+  renderCardSheet();
 }
 
 // ---------- ACTIONS ----------
@@ -385,16 +569,6 @@ function addAccount(){
   let bal=parseFloat(document.getElementById('accBal').value)||0;
   if(!name) return alert("Nom du compte requis.");
   DATA.accounts.push({id:DATA.nextAccId++,name,balance:bal}); save(); render();
-}
-function addTx(){
-  let date=document.getElementById('txDate').value;
-  let accountId=parseInt(document.getElementById('txAcc').value);
-  let type=document.getElementById('txType').value;
-  let category=document.getElementById('txCat').value;
-  let amount=parseFloat(document.getElementById('txAmount').value);
-  let note=document.getElementById('txNote').value;
-  if(!date||!amount) return alert("Date et montant requis.");
-  DATA.transactions.push({id:DATA.nextTxId++,date,accountId,type,category,amount,note}); save(); render();
 }
 function delTx(id){ DATA.transactions=DATA.transactions.filter(t=>t.id!==id); save(); render(); }
 function addRec(){
@@ -407,7 +581,11 @@ function addRec(){
   if(!label||!amount) return alert("Nom et montant requis.");
   DATA.recurring.push({id:DATA.nextRecId++,label,type,accountId,category,amount,dayOfMonth}); save(); render();
 }
-function delRec(id){ DATA.recurring=DATA.recurring.filter(r=>r.id!==id); save(); render(); }
+function delRec(id){
+  DATA.recurring=DATA.recurring.filter(r=>r.id!==id);
+  Object.keys(DATA.cardDefer).forEach(mk=>{ DATA.cardDefer[mk]=DATA.cardDefer[mk].filter(rid=>rid!==id); });
+  save(); render();
+}
 function setPrevisMonths(){ window.__previsMonths=document.getElementById('previsMonths').value; render(); }
 
 function exportJSON(){
@@ -426,7 +604,7 @@ function exportCSV(){
 function resetAll(){
   if(!confirm("Tout effacer ? Irréversible.")) return;
   DATA={accounts:[{id:1,name:"Compte courant",balance:0}],categories:["Salaire","Loyer","Courses","Transport","Loisirs","Santé","Autre"],
-    transactions:[],recurring:[],nextTxId:1,nextAccId:2,nextRecId:1};
+    transactions:[],recurring:[],cardDefer:{},nextTxId:1,nextAccId:2,nextRecId:1};
   save(); render();
 }
 function changePin(){
@@ -445,7 +623,7 @@ function importFile(file){
     try{
       if(file.name.endsWith('.json')){
         const obj=JSON.parse(text);
-        if(obj.transactions && obj.accounts){ DATA=obj; if(!DATA.recurring) DATA.recurring=[]; save(); msg.textContent="Sauvegarde chargée : "+DATA.transactions.length+" mouvements."; }
+        if(obj.transactions && obj.accounts){ DATA=obj; if(!DATA.recurring) DATA.recurring=[]; if(!DATA.cardDefer) DATA.cardDefer={}; save(); msg.textContent="Sauvegarde chargée : "+DATA.transactions.length+" mouvements."; }
         else msg.textContent="Fichier JSON non reconnu.";
       } else importCSVGeneric(text,msg);
       render();
