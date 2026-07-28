@@ -152,6 +152,10 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
   <div id="cardSheet" style="display:none;"></div>
 </div>
 
+<div id="monthPickerOverlay" onclick="if(event.target===this) closeMonthPicker()">
+  <div id="monthPickerSheet" style="display:none;"></div>
+</div>
+
 <script>
 /* =====================================================================
    CONFIGURATION FIREBASE — À REMPLIR
@@ -295,7 +299,7 @@ let cardModalMonth = todayStr().slice(0,7);
 
 // ---------- HELPERS ----------
 function fmt(n){ return (n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+" €"; }
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+function todayStr(){ let d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function accName(id){ return DATA.accounts.find(a=>a.id==id)?.name || "?"; }
 function computeBalance(accId){
   let bal = DATA.accounts.find(a=>a.id==accId)?.balance||0;
@@ -304,7 +308,7 @@ function computeBalance(accId){
 }
 function totalBalance(){ return DATA.accounts.reduce((s,a)=>s+computeBalance(a.id),0); }
 function monthLabel(mk){ let [y,m]=mk.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); }
-function shiftMonth(mk,delta){ let [y,m]=mk.split('-').map(Number); return new Date(y,m-1+delta,1).toISOString().slice(0,7); }
+function shiftMonth(mk,delta){ let [y,m]=mk.split('-').map(Number); let d=new Date(y,m-1+delta,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 function nextMonthKey(mk){ return shiftMonth(mk,1); }
 function recurringForMonth(mk){
   let prevMk = shiftMonth(mk,-1);
@@ -339,7 +343,7 @@ function renderDash(){
   let deferredList = DATA.cardDefer[currentMonth] || [];
   let deferredAmount = DATA.recurring.filter(r=>deferredList.includes(r.id) && r.type==='out').reduce((s,r)=>s+r.amount,0);
   return `
-  <div class="month-nav"><button onclick="changeMonth(-1)">‹</button><div class="m-label">${monthLabel(currentMonth)}</div><button onclick="changeMonth(1)">›</button></div>
+  <div class="month-nav"><button onclick="changeMonth(-1)">‹</button><div class="m-label" onclick="openMonthPicker()" style="cursor:pointer;">${monthLabel(currentMonth)} ▾</div><button onclick="changeMonth(1)">›</button></div>
   <div class="cards">
     <div class="card"><div class="lbl">Solde total</div><div class="val num accent">${fmt(totalBalance())}</div></div>
     <div class="card"><div class="lbl">Net réel du mois</div><div class="val num ${inMois-outMois>=0?'pos':'neg'}">${fmt(inMois-outMois)}</div></div>
@@ -355,6 +359,39 @@ function renderDash(){
   </div>`;
 }
 function changeMonth(delta){ currentMonth = shiftMonth(currentMonth, delta); render(); }
+
+// ---------- SELECTEUR MOIS / ANNEE ----------
+let pickerYear = parseInt(currentMonth.split('-')[0]);
+const MONTH_NAMES=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+function openMonthPicker(){
+  pickerYear = parseInt(currentMonth.split('-')[0]);
+  document.getElementById('monthPickerOverlay').style.cssText = "position:fixed;inset:0;background:rgba(4,5,8,.72);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;z-index:85;";
+  document.getElementById('monthPickerSheet').style.cssText = "display:block;width:100%;max-width:480px;background:var(--panel);border-radius:24px 24px 0 0;padding:22px 18px 28px;border:1px solid var(--line);border-bottom:none;";
+  renderMonthPicker();
+}
+function closeMonthPicker(){ document.getElementById('monthPickerOverlay').style.display='none'; }
+function renderMonthPicker(){
+  let curY=parseInt(currentMonth.split('-')[0]), curM=parseInt(currentMonth.split('-')[1]);
+  document.getElementById('monthPickerSheet').innerHTML = `
+    <div class="handle"></div>
+    <div class="row" style="align-items:center;margin-bottom:16px;">
+      <button class="btn ghost" style="width:auto;padding:10px 16px;" onclick="pickerYear--; renderMonthPicker();">‹</button>
+      <h2 class="pagehead" style="margin:0;text-align:center;flex:2;">${pickerYear}</h2>
+      <button class="btn ghost" style="width:auto;padding:10px 16px;" onclick="pickerYear++; renderMonthPicker();">›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      ${MONTH_NAMES.map((name,i)=>{
+        let active = (pickerYear===curY && (i+1)===curM);
+        return `<button class="btn ${active?'primary':'ghost'}" style="padding:14px 4px;font-size:13px;" onclick="pickMonth(${pickerYear},${i+1})">${name.slice(0,3)}</button>`;
+      }).join('')}
+    </div>
+    <button class="btn ghost" style="margin-top:16px;" onclick="closeMonthPicker()">Annuler</button>`;
+}
+function pickMonth(y,m){
+  currentMonth = y+'-'+String(m).padStart(2,'0');
+  closeMonthPicker();
+  render();
+}
 function renderTx(){
   let list=[...DATA.transactions].sort((a,b)=>b.date.localeCompare(a.date));
   return `
@@ -400,7 +437,7 @@ function renderPrevis(){
   let base=totalBalance();
   let rows=[]; let running=base; let cursor=new Date();
   for(let i=0;i<months;i++){
-    let mk = i===0 ? currentMonth : (cursor.setMonth(cursor.getMonth()+1), cursor.toISOString().slice(0,7));
+    let mk = i===0 ? currentMonth : (cursor.setMonth(cursor.getMonth()+1), cursor.getFullYear()+'-'+String(cursor.getMonth()+1).padStart(2,'0'));
     let {inSum,outSum} = recurringForMonth(mk);
     if(i>0) running += inSum - outSum;
     rows.push({m:mk, running});
