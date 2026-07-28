@@ -595,7 +595,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v11 (bouton + fixé correctement + finitions design)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v12 (repartir sur une base propre à partir d'une date)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -611,6 +611,11 @@ function renderIO(){
   <div class="panel"><h3 class="blocktitle">Détecter les récurrences</h3>
     <div class="small" style="margin-bottom:10px;">Analyse ton historique importé et repère les dépenses/revenus qui reviennent à l'identique 3 mois ou plus, pour te proposer de les ajouter en récurrent.</div>
     <button class="btn ghost" onclick="openRecurringDetector()">Analyser mes mouvements</button>
+  </div>
+  <div class="panel"><h3 class="blocktitle">Repartir sur une base propre</h3>
+    <div class="small" style="margin-bottom:10px;">Choisis une date de départ. Le solde de chaque compte sera recalculé exactement jusqu'à cette date puis fixé comme nouveau départ, et tous les mouvements avant cette date seront supprimés. Utile si un import a mélangé des chiffres.</div>
+    <div class="row"><input type="date" id="cleanStartDate"></div>
+    <button class="btn ghost" onclick="cleanStartFrom()">Repartir à partir de cette date</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Zone danger</h3>
     <button class="btn danger" style="width:100%;padding:14px;" onclick="resetAll()">Effacer toutes les données</button>
@@ -722,6 +727,22 @@ function exportCSV(){
   let blob=new Blob([csv],{type:"text/csv"});
   let a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download="moneymika-mouvements-"+todayStr()+".csv"; a.click();
+}
+function cleanStartFrom(){
+  let cutoff = document.getElementById('cleanStartDate').value;
+  if(!cutoff) return alert("Choisis une date.");
+  if(!confirm("Tous les mouvements avant le "+cutoff+" seront supprimés définitivement, et le solde sera recalculé à cette date. Continuer ?")) return;
+  DATA.accounts.forEach(acc=>{
+    let bal = acc.balance||0;
+    DATA.transactions.forEach(t=>{
+      if(t.accountId===acc.id && t.date < cutoff){ bal += (t.type==='in'?t.amount:-t.amount); }
+    });
+    acc.balance = bal;
+  });
+  DATA.transactions = DATA.transactions.filter(t=>t.date >= cutoff);
+  save();
+  render();
+  alert("Fait. Nouveau départ au "+cutoff+", soldes recalculés.");
 }
 function resetAll(){
   if(!confirm("Tout effacer ? Irréversible (aussi sur le cloud).")) return;
