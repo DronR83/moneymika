@@ -31,11 +31,23 @@ body{background-image:radial-gradient(ellipse 900px 500px at 50% -10%, rgba(201,
 }
 @media (min-width:720px){
   body{background:radial-gradient(ellipse 1200px 800px at 50% 0%, rgba(201,163,76,.10), transparent 60%),var(--ink);}
-  #shell{padding:40px 0;align-items:flex-start;justify-content:center;}
-  #app{max-width:520px;height:860px;border-radius:32px;border:1px solid var(--line);box-shadow:0 40px 100px rgba(0,0,0,.55), 0 0 0 1px rgba(201,163,76,.06);overflow:hidden;}
+  #shell{padding:32px 0;align-items:flex-start;justify-content:center;}
+  #app{max-width:560px;height:94vh;height:94dvh;max-height:920px;border-radius:32px;border:1px solid var(--line);box-shadow:0 40px 100px rgba(0,0,0,.55), 0 0 0 1px rgba(201,163,76,.06);overflow:hidden;}
+}
+/* Grands écrans presque carrés (ex : téléphone pliable ouvert) */
+@media (min-width:820px) and (max-aspect-ratio:6/5){
+  #app{max-width:640px;}
+  .cards{grid-template-columns:1fr 1fr 1fr 1fr;}
 }
 @media (max-width:360px){
   #content{padding-left:14px;padding-right:14px;}
+}
+/* Écran couvercle très étroit (ex : pliable fermé) */
+@media (max-width:330px){
+  #content{padding-left:12px;padding-right:12px;}
+  .cards{grid-template-columns:1fr;}
+  h2.pagehead{font-size:21px;}
+  #fab{width:52px;height:52px;font-size:24px;right:14px;}
 }
 #content{flex:1;padding:20px 18px 140px;overflow-y:auto;}
 h2.pagehead{font-family:var(--serif);font-size:clamp(24px,5vw,28px);font-weight:400;letter-spacing:.3px;margin:2px 0 18px;color:var(--txt);}
@@ -334,15 +346,17 @@ function recurringActiveInMonth(r, mk){
   return true;
 }
 function recurringForMonth(mk){
-  let prevMk = shiftMonth(mk,-1);
-  let deferredThisMonth = DATA.cardDefer[mk] || [];
-  let deferredFromPrev = DATA.cardDefer[prevMk] || [];
+  let validated = DATA.cardDefer[mk] || [];
   let inSum=0, outSum=0;
   DATA.recurring.forEach(r=>{
-    let excludedThisMonth = deferredThisMonth.includes(r.id);
-    let addedFromPrev = deferredFromPrev.includes(r.id);
-    if(!excludedThisMonth && recurringActiveInMonth(r,mk)){ if(r.type==='in') inSum+=r.amount; else outSum+=r.amount; }
-    if(addedFromPrev && recurringActiveInMonth(r,prevMk)){ if(r.type==='in') inSum+=r.amount; else outSum+=r.amount; }
+    if(!recurringActiveInMonth(r,mk)) return;
+    if(r.type==='in'){ inSum += r.amount; return; }
+    // type 'out'
+    if(r.paymentMethod==='carte'){
+      if(validated.includes(r.id)) outSum += r.amount;
+    } else {
+      outSum += r.amount;
+    }
   });
   return {inSum, outSum};
 }
@@ -369,8 +383,10 @@ function renderDash(){
   let inMois=txMois.filter(t=>t.type==='in').reduce((s,t)=>s+t.amount,0);
   let outMois=txMois.filter(t=>t.type==='out').reduce((s,t)=>s+t.amount,0);
   let recent=[...txMois].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
-  let deferredList = DATA.cardDefer[currentMonth] || [];
-  let deferredAmount = DATA.recurring.filter(r=>deferredList.includes(r.id) && r.type==='out').reduce((s,r)=>s+r.amount,0);
+  let carteItems = DATA.recurring.filter(r=>r.type==='out' && r.paymentMethod==='carte' && recurringActiveInMonth(r,currentMonth));
+  let validatedIds = DATA.cardDefer[currentMonth] || [];
+  let validatedAmount = carteItems.filter(r=>validatedIds.includes(r.id)).reduce((s,r)=>s+r.amount,0);
+  let pendingCount = carteItems.filter(r=>!validatedIds.includes(r.id)).length;
   let report = balanceBeforeMonth(currentMonth);
   let net = inMois-outMois;
   let finMois = report+net;
@@ -407,8 +423,8 @@ function renderDash(){
     <div class="card clickable" onclick="openDetailModal('in')"><div class="lbl">Entrées réelles</div><div class="val num pos">+${fmt(inMois)}</div></div>
     <div class="card clickable" onclick="openDetailModal('out')"><div class="lbl">Sorties réelles</div><div class="val num neg">-${fmt(outMois)}</div></div>
     <div class="card clickable" onclick="openCardModal(currentMonth)" style="grid-column:1/3;">
-      <div class="lbl">💳 Carte différée — ${monthLabel(currentMonth)}</div>
-      <div class="val num neg">-${fmt(deferredAmount)} <span class="small" style="font-family:var(--sans);">reportés au mois suivant</span></div>
+      <div class="lbl">💳 Carte du mois — ${monthLabel(currentMonth)}</div>
+      <div class="val num neg">-${fmt(validatedAmount)} <span class="small" style="font-family:var(--sans);">${pendingCount>0?pendingCount+' en attente de validation':'tout validé'}</span></div>
     </div>
   </div>
   <div class="panel"><h3 class="blocktitle">Mouvements du mois</h3>
@@ -526,7 +542,7 @@ function confirmRecCandidates(){
   let defaultAccId = DATA.accounts[0]?.id;
   recCandidates.forEach((c,i)=>{
     if(!recSelected.has(i)) return;
-    DATA.recurring.push({id:DATA.nextRecId++, label:c.note||c.category, type:c.type, accountId:defaultAccId, category:c.category, amount:c.amount, dayOfMonth:c.dayOfMonth});
+    DATA.recurring.push({id:DATA.nextRecId++, label:c.note||c.category, type:c.type, accountId:defaultAccId, category:c.category, amount:c.amount, dayOfMonth:c.dayOfMonth, paymentMethod: c.type==='out' ? 'rib' : null});
   });
   save();
   closeRecurringDetector();
@@ -556,22 +572,41 @@ function renderRec(){
   <h2 class="pagehead">Récurrent</h2>
   <div class="cards"><div class="card"><div class="lbl">Revenus fixes / mois</div><div class="val num pos">+${fmt(sumIn)}</div></div><div class="card"><div class="lbl">Dépenses fixes / mois</div><div class="val num neg">-${fmt(sumOut)}</div></div></div>
   <div class="panel"><h3 class="blocktitle">Ajouter un élément mensuel</h3>
-    <div class="row"><input id="recLabel" placeholder="Ex : Loyer, Salaire, Netflix"><select id="recType"><option value="out">Sortie</option><option value="in">Entrée</option></select></div>
+    <div class="row"><input id="recLabel" placeholder="Ex : Loyer, Salaire, Netflix"><select id="recType" onchange="toggleRecPaymentRow()"><option value="out">Sortie</option><option value="in">Entrée</option></select></div>
     <div class="row"><select id="recAcc">${accOpts}</select><select id="recCat">${catOpts}</select></div>
     <div class="row"><input id="recAmount" type="number" step="0.01" placeholder="Montant"><input id="recDay" type="number" min="1" max="28" placeholder="Jour (ex 5)"></div>
+    <div class="row" id="recPaymentRow">
+      <div style="flex:1;">
+        <div class="small" style="margin-bottom:4px;">Mode de prélèvement</div>
+        <div class="seg" style="margin-bottom:0;">
+          <button type="button" id="segRib" class="active" onclick="setRecPayment('rib')">RIB · auto</button>
+          <button type="button" id="segCarte" onclick="setRecPayment('carte')">Carte · à valider</button>
+        </div>
+      </div>
+    </div>
     <div class="row"><div><div class="small" style="margin-bottom:4px;">Début (optionnel)</div><input id="recStart" type="date"></div><div><div class="small" style="margin-bottom:4px;">Fin (optionnel)</div><input id="recEnd" type="date"></div></div>
     <button class="btn primary" onclick="addRec()">Ajouter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Revenus récurrents</h3>
+    <div class="small" style="margin-bottom:8px;">Toujours comptabilisés automatiquement chaque mois.</div>
     ${inList.map(r=>`<div class="list-item"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · ${accName(r.accountId)} · le ${r.dayOfMonth}${r.startDate?' · dès '+r.startDate:''}${r.endDate?" · jusqu\u00e0 "+r.endDate:""}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num pos">+${fmt(r.amount)}</span><button class="btn danger" onclick="delRec(${r.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun.</div>'}
   </div>
   <div class="panel"><h3 class="blocktitle">Dépenses récurrentes</h3>
-    ${outList.map(r=>`<div class="list-item"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · ${accName(r.accountId)} · le ${r.dayOfMonth}${r.startDate?' · dès '+r.startDate:''}${r.endDate?" · jusqu\u00e0 "+r.endDate:""}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(r.amount)}</span><button class="btn danger" onclick="delRec(${r.id})">✕</button></div></div>`).join('') || '<div class="small">Aucune.</div>'}
+    ${outList.map(r=>`<div class="list-item"><div><div class="item-main">${r.label} <span class="tag">${r.paymentMethod==='carte'?'💳 Carte':'🏦 RIB'}</span></div><div class="item-sub">${r.category} · ${accName(r.accountId)} · le ${r.dayOfMonth}${r.startDate?' · dès '+r.startDate:''}${r.endDate?" · jusqu\u00e0 "+r.endDate:""} · ${r.paymentMethod==='carte'?'à valider chaque mois':'auto chaque mois'}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(r.amount)}</span><button class="btn danger" onclick="delRec(${r.id})">✕</button></div></div>`).join('') || '<div class="small">Aucune.</div>'}
   </div>
-  <div class="panel"><h3 class="blocktitle">💳 Carte différée</h3>
-    <div class="small" style="margin-bottom:10px;">Gère les reports mois par mois depuis l'accueil, carte "Carte différée".</div>
+  <div class="panel"><h3 class="blocktitle">💳 Carte du mois</h3>
+    <div class="small" style="margin-bottom:10px;">Les dépenses taguées "Carte" ne comptent que si tu les valides ici, mois par mois. Les RIB comptent toujours automatiquement.</div>
     <button class="btn ghost" onclick="openCardModal(currentMonth)">Ouvrir pour ${monthLabel(currentMonth)}</button>
   </div>`;
+}
+function setRecPayment(m){
+  window.__recPayment = m;
+  document.getElementById('segRib').classList.toggle('active', m==='rib');
+  document.getElementById('segCarte').classList.toggle('active', m==='carte');
+}
+function toggleRecPaymentRow(){
+  let type = document.getElementById('recType').value;
+  document.getElementById('recPaymentRow').style.display = type==='out' ? 'flex' : 'none';
 }
 function renderPrevis(){
   let months=parseInt(window.__previsMonths||48);
@@ -595,7 +630,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v12 (repartir sur une base propre à partir d'une date)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v14 (RIB auto vs Carte à valider chaque mois)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -664,21 +699,23 @@ function openCardModal(mk){
 }
 function closeCardModal(){ document.getElementById('cardOverlay').style.display='none'; }
 function renderCardSheet(){
-  let outList = DATA.recurring.filter(r=>r.type==='out');
-  let deferred = DATA.cardDefer[cardModalMonth] || [];
+  let carteList = DATA.recurring.filter(r=>r.type==='out' && r.paymentMethod==='carte' && recurringActiveInMonth(r,cardModalMonth));
+  let validated = DATA.cardDefer[cardModalMonth] || [];
+  let totalValidated = carteList.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+r.amount,0);
   document.getElementById('cardSheet').innerHTML = `
     <div class="handle"></div>
-    <h3 class="blocktitle">💳 Carte différée</h3>
-    <h2 class="pagehead" style="margin-bottom:6px;">${monthLabel(cardModalMonth)}</h2>
-    <div class="small" style="margin-bottom:14px;">Coche : ne compte plus pour ${monthLabel(cardModalMonth)}, ajouté à ${monthLabel(nextMonthKey(cardModalMonth))} à la place.</div>
+    <h3 class="blocktitle">💳 Carte du mois</h3>
+    <h2 class="pagehead" style="margin-bottom:2px;">${monthLabel(cardModalMonth)}</h2>
+    <div class="num neg" style="font-size:20px;margin-bottom:6px;">-${fmt(totalValidated)} validé</div>
+    <div class="small" style="margin-bottom:14px;">Coche une dépense carte : elle compte pour ${monthLabel(cardModalMonth)}. Non cochée, elle ne compte pas du tout ce mois-ci.</div>
     <div class="row" style="margin-bottom:14px;">
       <button class="btn ghost" onclick="openCardModal(shiftMonth(cardModalMonth,-1))">‹ ${monthLabel(shiftMonth(cardModalMonth,-1))}</button>
       <button class="btn ghost" onclick="openCardModal(shiftMonth(cardModalMonth,1))">${monthLabel(shiftMonth(cardModalMonth,1))} ›</button>
     </div>
-    ${outList.map(r=>{
-      let on = deferred.includes(r.id);
+    ${carteList.map(r=>{
+      let on = validated.includes(r.id);
       return `<div class="list-item"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · -${fmt(r.amount)}</div></div><div class="check ${on?'on':''}" onclick="toggleDefer(${r.id})"></div></div>`;
-    }).join('') || '<div class="small">Aucune dépense récurrente.</div>'}
+    }).join('') || '<div class="small">Aucune dépense taguée "Carte". Tague-en une dans Récurrent.</div>'}
     <button class="btn primary" style="margin-top:16px;" onclick="closeCardModal(); render();">Fermer</button>`;
 }
 function toggleDefer(recId){
@@ -706,8 +743,10 @@ function addRec(){
   let dayOfMonth=parseInt(document.getElementById('recDay').value)||1;
   let startDate=document.getElementById('recStart').value || null;
   let endDate=document.getElementById('recEnd').value || null;
+  let paymentMethod = type==='out' ? (window.__recPayment||'rib') : null;
   if(!label||!amount) return alert("Nom et montant requis.");
-  DATA.recurring.push({id:DATA.nextRecId++,label,type,accountId,category,amount,dayOfMonth,startDate,endDate}); save(); render();
+  DATA.recurring.push({id:DATA.nextRecId++,label,type,accountId,category,amount,dayOfMonth,startDate,endDate,paymentMethod}); save(); render();
+  window.__recPayment='rib';
 }
 function delRec(id){
   DATA.recurring=DATA.recurring.filter(r=>r.id!==id);
