@@ -356,6 +356,12 @@ function render(){
   if(VIEW==='io') c.innerHTML=renderIO();
   attachDrop();
 }
+function balanceBeforeMonth(mk){
+  let bal = DATA.accounts.reduce((s,a)=>s+(a.balance||0),0);
+  let firstDay = mk+'-01';
+  DATA.transactions.forEach(t=>{ if(t.date < firstDay) bal += (t.type==='in'?t.amount:-t.amount); });
+  return bal;
+}
 function renderDash(){
   let txMois=DATA.transactions.filter(t=>t.date.slice(0,7)===currentMonth);
   let inMois=txMois.filter(t=>t.type==='in').reduce((s,t)=>s+t.amount,0);
@@ -363,11 +369,39 @@ function renderDash(){
   let recent=[...txMois].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
   let deferredList = DATA.cardDefer[currentMonth] || [];
   let deferredAmount = DATA.recurring.filter(r=>deferredList.includes(r.id) && r.type==='out').reduce((s,r)=>s+r.amount,0);
+  let report = balanceBeforeMonth(currentMonth);
+  let net = inMois-outMois;
+  let finMois = report+net;
+  let barTotal = Math.abs(inMois)+Math.abs(outMois);
+  let pctDep = barTotal>0 ? Math.min(100, outMois/barTotal*100) : 0;
   return `
   <div class="month-nav"><button onclick="changeMonth(-1)">‹</button><div class="m-label" onclick="openMonthPicker()" style="cursor:pointer;">${monthLabel(currentMonth)} ▾</div><button onclick="changeMonth(1)">›</button></div>
+
+  <div class="panel" style="text-align:center;">
+    <h3 class="blocktitle" style="margin-bottom:4px;">Résumé du mois</h3>
+    <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line-soft);">
+      <span class="small">Report (solde en début de mois)</span>
+      <span class="num accent">${fmt(report)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line-soft);">
+      <span class="small">Revenus</span>
+      <span class="num pos">+${fmt(inMois)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line-soft);">
+      <span class="small">Dépenses</span>
+      <span class="num neg">-${fmt(outMois)}</span>
+    </div>
+    <div style="margin:14px 0 8px;background:var(--line-soft);border-radius:8px;height:8px;overflow:hidden;display:flex;">
+      <div style="height:8px;background:var(--green);width:${100-pctDep}%;"></div>
+      <div style="height:8px;background:var(--red);width:${pctDep}%;"></div>
+    </div>
+    <div class="small" style="margin-bottom:2px;">Solde estimé fin de mois</div>
+    <div class="num ${finMois>=0?'accent':'neg'}" style="font-size:26px;">${fmt(finMois)}</div>
+  </div>
+
   <div class="cards">
     <div class="card"><div class="lbl">Solde total</div><div class="val num accent">${fmt(totalBalance())}</div></div>
-    <div class="card"><div class="lbl">Net réel du mois</div><div class="val num ${inMois-outMois>=0?'pos':'neg'}">${fmt(inMois-outMois)}</div></div>
+    <div class="card"><div class="lbl">Net réel du mois</div><div class="val num ${net>=0?'pos':'neg'}">${fmt(net)}</div></div>
     <div class="card clickable" onclick="openDetailModal('in')"><div class="lbl">Entrées réelles</div><div class="val num pos">+${fmt(inMois)}</div></div>
     <div class="card clickable" onclick="openDetailModal('out')"><div class="lbl">Sorties réelles</div><div class="val num neg">-${fmt(outMois)}</div></div>
     <div class="card clickable" onclick="openCardModal(currentMonth)" style="grid-column:1/3;">
@@ -559,7 +593,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v9 (dates début/fin sur récurrences)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v10 (anti-doublon import + résumé du mois façon Money Control)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -721,7 +755,8 @@ function importCSVGeneric(text,msg){
   let idx={date:headers.findIndex(h=>h.includes('date')),amount:headers.findIndex(h=>h.includes('amount')||h.includes('montant')),category:headers.findIndex(h=>h.includes('categ')),note:noteIdxRemarque>-1?noteIdxRemarque:(noteIdxGeneric>-1?noteIdxGeneric:noteIdxGroupe),noteAlt:noteIdxRemarque>-1?noteIdxGroupe:-1,account:headers.findIndex(h=>h.includes('account')||(h.includes('compte')&&!h.includes('contrepartie'))),type:headers.findIndex(h=>h.includes('type'))};
   if(idx.date===-1||idx.amount===-1){ msg.textContent="Colonnes date/montant introuvables. Colonnes : "+headers.join(', '); return; }
   let defaultAcc=DATA.accounts[0]; if(!defaultAcc){ defaultAcc={id:1,name:"Compte importé",balance:0}; DATA.accounts.push(defaultAcc); }
-  let count=0;
+  let existingKeys = new Set(DATA.transactions.map(t=>t.date+'|'+t.type+'|'+t.amount.toFixed(2)+'|'+(t.note||'').trim().toLowerCase()));
+  let count=0, skipped=0;
   for(let i=1;i<lines.length;i++){
     let cols=splitCSVLine(lines[i],delim); if(cols.length<2) continue;
     let raw=(cols[idx.amount]||'0').replace(/[^\d,.\-]/g,'').replace(',','.');
@@ -732,11 +767,15 @@ function importCSVGeneric(text,msg){
     if(idx.account>-1 && cols[idx.account]){ let nm=cols[idx.account].trim(); let found=DATA.accounts.find(a=>a.name===nm); if(!found){ found={id:DATA.nextAccId++,name:nm,balance:0}; DATA.accounts.push(found); } acc=found.id; }
     let noteVal = idx.note>-1?(cols[idx.note]||'').trim():'';
     if(!noteVal && idx.noteAlt>-1) noteVal = (cols[idx.noteAlt]||'').trim();
-    DATA.transactions.push({id:DATA.nextTxId++,date:normalizeDate(cols[idx.date]),accountId:acc,type,category:idx.category>-1&&cols[idx.category]?cols[idx.category]:'Autre',amount:Math.abs(amount),note:noteVal});
+    let dateVal = normalizeDate(cols[idx.date]);
+    let dedupeKey = dateVal+'|'+type+'|'+Math.abs(amount).toFixed(2)+'|'+noteVal.trim().toLowerCase();
+    if(existingKeys.has(dedupeKey)){ skipped++; continue; }
+    existingKeys.add(dedupeKey);
+    DATA.transactions.push({id:DATA.nextTxId++,date:dateVal,accountId:acc,type,category:idx.category>-1&&cols[idx.category]?cols[idx.category]:'Autre',amount:Math.abs(amount),note:noteVal});
     count++;
   }
   save();
-  msg.textContent=count+" mouvements importés.";
+  msg.textContent=count+" mouvements importés"+(skipped>0?(", "+skipped+" doublons évités"):"")+".";
 }
 function splitCSVLine(line,delim){
   let out=[],cur='',inQ=false;
