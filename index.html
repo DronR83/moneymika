@@ -159,12 +159,12 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
    Console Firebase > Paramètres du projet > tes applications > Config SDK
 ===================================================================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyChQMyMTU57gy-gHfSYAqAxoZL1uzzi4jE",
-  authDomain: "money-mika.firebaseapp.com",
-  projectId: "money-mika",
-  storageBucket: "money-mika.firebasestorage.app",
-  messagingSenderId: "396790183836",
-  appId: "1:396790183836:web:b652bc0a9488592d807a59"
+  apiKey: "REMPLACE_MOI",
+  authDomain: "REMPLACE_MOI.firebaseapp.com",
+  projectId: "REMPLACE_MOI",
+  storageBucket: "REMPLACE_MOI.appspot.com",
+  messagingSenderId: "REMPLACE_MOI",
+  appId: "REMPLACE_MOI"
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
@@ -217,8 +217,16 @@ async function doLogin(){
     try{
       cred = await auth.signInWithEmailAndPassword(email, password);
     }catch(err){
-      if(err.code==='auth/user-not-found'){
-        cred = await auth.createUserWithEmailAndPassword(email, password);
+      if(err.code==='auth/user-not-found' || err.code==='auth/invalid-credential'){
+        try{
+          cred = await auth.createUserWithEmailAndPassword(email, password);
+        }catch(err2){
+          if(err2.code==='auth/email-already-in-use'){
+            throw new Error("Mot de passe incorrect.");
+          } else if(err2.code==='auth/weak-password'){
+            throw new Error("Mot de passe trop faible (6 caractères min).");
+          } else { throw err2; }
+        }
       } else if(err.code==='auth/wrong-password'){
         throw new Error("Mot de passe incorrect.");
       } else if(err.code==='auth/invalid-email'){
