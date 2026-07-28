@@ -156,6 +156,14 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
   <div id="monthPickerSheet" style="display:none;"></div>
 </div>
 
+<div id="detailOverlay" onclick="if(event.target===this) closeDetailModal()">
+  <div id="detailSheet" style="display:none;"></div>
+</div>
+
+<div id="recDetectOverlay" onclick="if(event.target===this) closeRecurringDetector()">
+  <div id="recDetectSheet" style="display:none;"></div>
+</div>
+
 <script>
 /* =====================================================================
    CONFIGURATION FIREBASE — À REMPLIR
@@ -347,8 +355,8 @@ function renderDash(){
   <div class="cards">
     <div class="card"><div class="lbl">Solde total</div><div class="val num accent">${fmt(totalBalance())}</div></div>
     <div class="card"><div class="lbl">Net réel du mois</div><div class="val num ${inMois-outMois>=0?'pos':'neg'}">${fmt(inMois-outMois)}</div></div>
-    <div class="card"><div class="lbl">Entrées réelles</div><div class="val num pos">+${fmt(inMois)}</div></div>
-    <div class="card"><div class="lbl">Sorties réelles</div><div class="val num neg">-${fmt(outMois)}</div></div>
+    <div class="card clickable" onclick="openDetailModal('in')"><div class="lbl">Entrées réelles</div><div class="val num pos">+${fmt(inMois)}</div></div>
+    <div class="card clickable" onclick="openDetailModal('out')"><div class="lbl">Sorties réelles</div><div class="val num neg">-${fmt(outMois)}</div></div>
     <div class="card clickable" onclick="openCardModal(currentMonth)" style="grid-column:1/3;">
       <div class="lbl">💳 Carte différée — ${monthLabel(currentMonth)}</div>
       <div class="val num neg">-${fmt(deferredAmount)} <span class="small" style="font-family:var(--sans);">reportés au mois suivant</span></div>
@@ -390,6 +398,89 @@ function renderMonthPicker(){
 function pickMonth(y,m){
   currentMonth = y+'-'+String(m).padStart(2,'0');
   closeMonthPicker();
+  render();
+}
+
+// ---------- DETAIL ENTREES / SORTIES ----------
+function openDetailModal(type){
+  const overlay = document.getElementById('detailOverlay');
+  const sheet = document.getElementById('detailSheet');
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(4,5,8,.72);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;z-index:85;";
+  sheet.style.cssText = "display:block;width:100%;max-width:480px;background:var(--panel);border-radius:24px 24px 0 0;padding:22px 18px 28px;border:1px solid var(--line);border-bottom:none;max-height:80vh;overflow-y:auto;";
+  let list = DATA.transactions.filter(t=>t.date.slice(0,7)===currentMonth && t.type===type)
+    .sort((a,b)=>b.date.localeCompare(a.date));
+  let total = list.reduce((s,t)=>s+t.amount,0);
+  // regroupement par catégorie
+  let byCat = {};
+  list.forEach(t=>{ byCat[t.category]=(byCat[t.category]||0)+t.amount; });
+  let catRows = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  sheet.innerHTML = `
+    <div class="handle"></div>
+    <h3 class="blocktitle">${type==='in'?'Entrées':'Sorties'} — ${monthLabel(currentMonth)}</h3>
+    <h2 class="pagehead ${type==='in'?'pos':'neg'}" style="margin-bottom:14px;">${type==='in'?'+':'-'}${fmt(total)}</h2>
+    <div style="margin-bottom:14px;">
+      ${catRows.map(([cat,amt])=>`<div class="list-item"><div class="item-main">${cat}</div><div class="num ${type==='in'?'pos':'neg'}">${fmt(amt)}</div></div>`).join('') || '<div class="small">Rien.</div>'}
+    </div>
+    <h3 class="blocktitle">Détail des mouvements</h3>
+    ${list.map(t=>`<div class="list-item"><div><div class="item-main">${t.category} · ${accName(t.accountId)}</div><div class="item-sub">${t.date}${t.note?' — '+t.note:''}</div></div>
+      <div style="display:flex;align-items:center;gap:8px;"><span class="num ${type==='in'?'pos':'neg'}">${fmt(t.amount)}</span>
+      <button class="btn danger" onclick="delTx(${t.id}); openDetailModal('${type}');">✕</button></div></div>`).join('') || '<div class="small">Aucun mouvement.</div>'}
+    <button class="btn primary" style="margin-top:16px;" onclick="closeDetailModal()">Fermer</button>`;
+}
+function closeDetailModal(){ document.getElementById('detailOverlay').style.display='none'; }
+
+// ---------- DETECTEUR DE RECURRENCES ----------
+function detectRecurringCandidates(){
+  let map = {};
+  DATA.transactions.forEach(t=>{
+    let key = t.type+'|'+t.category+'|'+t.amount.toFixed(2)+'|'+(t.note||'').toLowerCase().trim();
+    if(!map[key]) map[key] = {type:t.type, category:t.category, amount:t.amount, note:t.note, months:new Set(), days:[]};
+    map[key].months.add(t.date.slice(0,7));
+    map[key].days.push(parseInt(t.date.slice(8,10)));
+  });
+  let existing = new Set(DATA.recurring.map(r=>r.type+'|'+r.category+'|'+r.amount.toFixed(2)+'|'+(r.label||'').toLowerCase().trim()));
+  return Object.values(map)
+    .filter(v=>v.months.size>=3)
+    .filter(v=>!existing.has(v.type+'|'+v.category+'|'+v.amount.toFixed(2)+'|'+(v.note||'').toLowerCase().trim()))
+    .map(v=>({...v, dayOfMonth: Math.round(v.days.reduce((s,d)=>s+d,0)/v.days.length)}))
+    .sort((a,b)=>b.months.size-a.months.size);
+}
+let recCandidates = [];
+let recSelected = new Set();
+function openRecurringDetector(){
+  recCandidates = detectRecurringCandidates();
+  recSelected = new Set(recCandidates.map((_,i)=>i));
+  const overlay=document.getElementById('recDetectOverlay'), sheet=document.getElementById('recDetectSheet');
+  overlay.style.cssText="position:fixed;inset:0;background:rgba(4,5,8,.72);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;z-index:85;";
+  sheet.style.cssText="display:block;width:100%;max-width:480px;background:var(--panel);border-radius:24px 24px 0 0;padding:22px 18px 28px;border:1px solid var(--line);border-bottom:none;max-height:80vh;overflow-y:auto;";
+  renderRecDetectSheet();
+}
+function closeRecurringDetector(){ document.getElementById('recDetectOverlay').style.display='none'; }
+function renderRecDetectSheet(){
+  document.getElementById('recDetectSheet').innerHTML = `
+    <div class="handle"></div>
+    <h3 class="blocktitle">Récurrences détectées</h3>
+    <h2 class="pagehead" style="margin-bottom:10px;">${recCandidates.length} trouvée(s)</h2>
+    ${recCandidates.length===0 ? '<div class="small">Rien de nouveau à proposer.</div>' : recCandidates.map((c,i)=>{
+      let on = recSelected.has(i);
+      return `<div class="list-item"><div><div class="item-main">${c.note || c.category}</div>
+        <div class="item-sub">${c.category} · vu ${c.months.size} mois · le ${c.dayOfMonth}</div></div>
+        <div style="display:flex;align-items:center;gap:10px;">
+        <span class="num ${c.type==='in'?'pos':'neg'}">${c.type==='in'?'+':'-'}${fmt(c.amount)}</span>
+        <div class="check ${on?'on':''}" onclick="toggleRecCandidate(${i})"></div></div></div>`;
+    }).join('')}
+    ${recCandidates.length>0 ? `<button class="btn primary" style="margin-top:16px;" onclick="confirmRecCandidates()">Ajouter les cochées</button>` : ''}
+    <button class="btn ghost" style="margin-top:8px;" onclick="closeRecurringDetector()">Fermer</button>`;
+}
+function toggleRecCandidate(i){ if(recSelected.has(i)) recSelected.delete(i); else recSelected.add(i); renderRecDetectSheet(); }
+function confirmRecCandidates(){
+  let defaultAccId = DATA.accounts[0]?.id;
+  recCandidates.forEach((c,i)=>{
+    if(!recSelected.has(i)) return;
+    DATA.recurring.push({id:DATA.nextRecId++, label:c.note||c.category, type:c.type, accountId:defaultAccId, category:c.category, amount:c.amount, dayOfMonth:c.dayOfMonth});
+  });
+  save();
+  closeRecurringDetector();
   render();
 }
 function renderTx(){
@@ -454,6 +545,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v7 (correctif fuseau horaire + sélecteur mois)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -465,6 +557,10 @@ function renderIO(){
     <div class="small" style="margin-bottom:10px;">Sauvegarde JSON de cette appli, ou export CSV Money Control / Money Manager.</div>
     <div id="dropzone">Choisir un fichier<br><input type="file" id="fileInput" accept=".json,.csv,.txt" style="margin-top:8px;"></div>
     <div id="importMsg" class="small" style="margin-top:8px;"></div>
+  </div>
+  <div class="panel"><h3 class="blocktitle">Détecter les récurrences</h3>
+    <div class="small" style="margin-bottom:10px;">Analyse ton historique importé et repère les dépenses/revenus qui reviennent à l'identique 3 mois ou plus, pour te proposer de les ajouter en récurrent.</div>
+    <button class="btn ghost" onclick="openRecurringDetector()">Analyser mes mouvements</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Zone danger</h3>
     <button class="btn danger" style="width:100%;padding:14px;" onclick="resetAll()">Effacer toutes les données</button>
@@ -597,12 +693,16 @@ function importFile(file){
   };
   reader.readAsText(file);
 }
+function stripAccents(s){ return s.normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
 function importCSVGeneric(text,msg){
   let lines=text.split(/\r?\n/).filter(l=>l.trim().length);
   if(!lines.length){ msg.textContent="Fichier vide."; return; }
   let delim=lines[0].includes(';')?';':',';
-  let headers=splitCSVLine(lines[0],delim).map(h=>h.trim().toLowerCase());
-  let idx={date:headers.findIndex(h=>h.includes('date')),amount:headers.findIndex(h=>h.includes('amount')||h.includes('montant')),category:headers.findIndex(h=>h.includes('categ')),note:headers.findIndex(h=>h.includes('note')||h.includes('memo')||h.includes('desc')),account:headers.findIndex(h=>h.includes('account')||h.includes('compte')),type:headers.findIndex(h=>h.includes('type'))};
+  let headers=splitCSVLine(lines[0],delim).map(h=>stripAccents(h.trim().toLowerCase()));
+  let noteIdxRemarque=headers.findIndex(h=>h.includes('remarque'));
+  let noteIdxGroupe=headers.findIndex(h=>h.includes('groupe'));
+  let noteIdxGeneric=headers.findIndex(h=>h.includes('note')||h.includes('memo')||h.includes('desc'));
+  let idx={date:headers.findIndex(h=>h.includes('date')),amount:headers.findIndex(h=>h.includes('amount')||h.includes('montant')),category:headers.findIndex(h=>h.includes('categ')),note:noteIdxRemarque>-1?noteIdxRemarque:(noteIdxGeneric>-1?noteIdxGeneric:noteIdxGroupe),noteAlt:noteIdxRemarque>-1?noteIdxGroupe:-1,account:headers.findIndex(h=>h.includes('account')||(h.includes('compte')&&!h.includes('contrepartie'))),type:headers.findIndex(h=>h.includes('type'))};
   if(idx.date===-1||idx.amount===-1){ msg.textContent="Colonnes date/montant introuvables. Colonnes : "+headers.join(', '); return; }
   let defaultAcc=DATA.accounts[0]; if(!defaultAcc){ defaultAcc={id:1,name:"Compte importé",balance:0}; DATA.accounts.push(defaultAcc); }
   let count=0;
@@ -611,10 +711,12 @@ function importCSVGeneric(text,msg){
     let raw=(cols[idx.amount]||'0').replace(/[^\d,.\-]/g,'').replace(',','.');
     let amount=parseFloat(raw); if(isNaN(amount)) continue;
     let type=amount<0?'out':'in';
-    if(idx.type>-1 && cols[idx.type]){ let tv=cols[idx.type].toLowerCase(); if(tv.includes('exp')||tv.includes('depens')||tv.includes('debit')) type='out'; if(tv.includes('inc')||tv.includes('revenu')||tv.includes('credit')) type='in'; }
+    if(idx.type>-1 && cols[idx.type]){ let tv=stripAccents(cols[idx.type].toLowerCase()); if(tv.includes('exp')||tv.includes('depens')||tv.includes('debit')) type='out'; if(tv.includes('inc')||tv.includes('revenu')||tv.includes('credit')) type='in'; }
     let acc=defaultAcc.id;
     if(idx.account>-1 && cols[idx.account]){ let nm=cols[idx.account].trim(); let found=DATA.accounts.find(a=>a.name===nm); if(!found){ found={id:DATA.nextAccId++,name:nm,balance:0}; DATA.accounts.push(found); } acc=found.id; }
-    DATA.transactions.push({id:DATA.nextTxId++,date:normalizeDate(cols[idx.date]),accountId:acc,type,category:idx.category>-1?(cols[idx.category]||'Autre'):'Autre',amount:Math.abs(amount),note:idx.note>-1?cols[idx.note]:''});
+    let noteVal = idx.note>-1?(cols[idx.note]||'').trim():'';
+    if(!noteVal && idx.noteAlt>-1) noteVal = (cols[idx.noteAlt]||'').trim();
+    DATA.transactions.push({id:DATA.nextTxId++,date:normalizeDate(cols[idx.date]),accountId:acc,type,category:idx.category>-1&&cols[idx.category]?cols[idx.category]:'Autre',amount:Math.abs(amount),note:noteVal});
     count++;
   }
   save();
