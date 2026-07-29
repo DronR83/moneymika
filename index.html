@@ -91,6 +91,7 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
 #quickSheet .handle{width:40px;height:4px;background:var(--line);border-radius:4px;margin:0 auto 16px;}
 .seg{display:flex;background:var(--panel2);border-radius:12px;padding:4px;margin-bottom:10px;}
 .seg button{flex:1;background:none;border:none;color:var(--sub);padding:10px;border-radius:9px;font-weight:600;font-size:13px;transition:all .15s ease;box-shadow:none;}
+.seg button.active{background:var(--brass);color:#1a1305;}
 .seg button.active.out{background:rgba(255,107,107,.15);color:var(--red);}
 .seg button.active.in{background:rgba(61,220,132,.15);color:var(--green);}
 .list-item{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line-soft);border-radius:10px;transition:background .15s ease;margin:0 -4px;}
@@ -276,6 +277,9 @@ async function doLogin(){
       currentKey = key; currentSaltB64 = d.salt;
       DATA = await decryptData(key, d.iv, d.data);
       if(!DATA.cardDefer) DATA.cardDefer={};
+      if(!DATA.cardExtras) DATA.cardExtras={};
+      if(!DATA.cardManualTotal) DATA.cardManualTotal={};
+      if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1;
     } else {
       const {key, salt} = await deriveKey(password);
       currentKey = key; currentSaltB64 = bufToBase64(salt);
@@ -315,10 +319,13 @@ const LOCAL_KEY = "moneymika_local_cache";
 let DATA = loadLocal() || {
   accounts:[{id:1,name:"Compte courant",balance:0}],
   categories:["Salaire","Loyer","Courses","Transport","Loisirs","Santé","Autre"],
-  transactions:[], recurring:[], cardDefer:{},
-  nextTxId:1, nextAccId:2, nextRecId:1
+  transactions:[], recurring:[], cardDefer:{}, cardExtras:{}, cardManualTotal:{},
+  nextTxId:1, nextAccId:2, nextRecId:1, nextCardExtraId:1
 };
 if(!DATA.cardDefer) DATA.cardDefer={};
+if(!DATA.cardExtras) DATA.cardExtras={};
+if(!DATA.cardManualTotal) DATA.cardManualTotal={};
+if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1;
 function saveLocal(){ localStorage.setItem(LOCAL_KEY, JSON.stringify(DATA)); }
 function loadLocal(){ try{ return JSON.parse(localStorage.getItem(LOCAL_KEY)); }catch(e){ return null; } }
 function save(){ saveLocal(); scheduleCloudSave(); }
@@ -345,19 +352,30 @@ function recurringActiveInMonth(r, mk){
   if(r.endDate && mk > r.endDate.slice(0,7)) return false;
   return true;
 }
-function recurringForMonth(mk){
+// Total de la carte pour un mois : si un montant a été saisi manuellement, il fait foi
+// (les récurrentes cochées et les ponctuels ne s'additionnent plus dessus, pour éviter les doublons).
+// Sinon, calcul automatique = récurrentes carte cochées + achats ponctuels.
+function cardAutoTotal(mk){
   let validated = DATA.cardDefer[mk] || [];
+  let carte = DATA.recurring.filter(r=>r.type==='out' && r.paymentMethod==='carte' && recurringActiveInMonth(r,mk));
+  let sum = carte.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+r.amount,0);
+  let extras = DATA.cardExtras[mk] || [];
+  sum += extras.reduce((s,e)=>s+e.amount,0);
+  return sum;
+}
+function cardTotalForMonth(mk){
+  let manual = DATA.cardManualTotal[mk];
+  if(manual!==undefined && manual!==null && manual!=='') return parseFloat(manual);
+  return cardAutoTotal(mk);
+}
+function recurringForMonth(mk){
   let inSum=0, outSum=0;
   DATA.recurring.forEach(r=>{
     if(!recurringActiveInMonth(r,mk)) return;
     if(r.type==='in'){ inSum += r.amount; return; }
-    // type 'out'
-    if(r.paymentMethod==='carte'){
-      if(validated.includes(r.id)) outSum += r.amount;
-    } else {
-      outSum += r.amount;
-    }
+    if(r.paymentMethod!=='carte'){ outSum += r.amount; }
   });
+  outSum += cardTotalForMonth(mk);
   return {inSum, outSum};
 }
 
@@ -383,10 +401,8 @@ function renderDash(){
   let inMois=txMois.filter(t=>t.type==='in').reduce((s,t)=>s+t.amount,0);
   let outMois=txMois.filter(t=>t.type==='out').reduce((s,t)=>s+t.amount,0);
   let recent=[...txMois].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
-  let carteItems = DATA.recurring.filter(r=>r.type==='out' && r.paymentMethod==='carte' && recurringActiveInMonth(r,currentMonth));
-  let validatedIds = DATA.cardDefer[currentMonth] || [];
-  let validatedAmount = carteItems.filter(r=>validatedIds.includes(r.id)).reduce((s,r)=>s+r.amount,0);
-  let pendingCount = carteItems.filter(r=>!validatedIds.includes(r.id)).length;
+  let validatedAmount = cardTotalForMonth(currentMonth);
+  let isManualCard = DATA.cardManualTotal[currentMonth]!==undefined && DATA.cardManualTotal[currentMonth]!==null && DATA.cardManualTotal[currentMonth]!=='';
   let report = balanceBeforeMonth(currentMonth);
   let net = inMois-outMois;
   let finMois = report+net;
@@ -424,7 +440,7 @@ function renderDash(){
     <div class="card clickable" onclick="openDetailModal('out')"><div class="lbl">Sorties réelles</div><div class="val num neg">-${fmt(outMois)}</div></div>
     <div class="card clickable" onclick="openCardModal(currentMonth)" style="grid-column:1/3;">
       <div class="lbl">💳 Carte du mois — ${monthLabel(currentMonth)}</div>
-      <div class="val num neg">-${fmt(validatedAmount)} <span class="small" style="font-family:var(--sans);">${pendingCount>0?pendingCount+' en attente de validation':'tout validé'}</span></div>
+      <div class="val num neg">-${fmt(validatedAmount)} <span class="small" style="font-family:var(--sans);">${isManualCard?'montant saisi':'calcul auto'}</span></div>
     </div>
   </div>
   <div class="panel"><h3 class="blocktitle">Mouvements du mois</h3>
@@ -585,6 +601,7 @@ function renderRec(){
       </div>
     </div>
     <div class="row"><div><div class="small" style="margin-bottom:4px;">Début (optionnel)</div><input id="recStart" type="date"></div><div><div class="small" style="margin-bottom:4px;">Fin (optionnel)</div><input id="recEnd" type="date"></div></div>
+    <label class="small" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><input type="checkbox" id="recAlsoLog" checked style="width:auto;"> Aussi l'enregistrer comme mouvement réel de ce mois-ci</label>
     <button class="btn primary" onclick="addRec()">Ajouter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Revenus récurrents</h3>
@@ -630,7 +647,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v14 (RIB auto vs Carte à valider chaque mois)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v16 (montant carte manuel + catégories éditables + bug RIB/Carte corrigé)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -651,6 +668,12 @@ function renderIO(){
     <div class="small" style="margin-bottom:10px;">Choisis une date de départ. Le solde de chaque compte sera recalculé exactement jusqu'à cette date puis fixé comme nouveau départ, et tous les mouvements avant cette date seront supprimés. Utile si un import a mélangé des chiffres.</div>
     <div class="row"><input type="date" id="cleanStartDate"></div>
     <button class="btn ghost" onclick="cleanStartFrom()">Repartir à partir de cette date</button>
+  </div>
+  <div class="panel"><h3 class="blocktitle">Catégories</h3>
+    <div class="small" style="margin-bottom:10px;">Touche un nom pour le renommer. Les mouvements déjà enregistrés sont mis à jour automatiquement.</div>
+    ${DATA.categories.map(c=>`<div class="list-item"><div class="item-main" style="cursor:pointer;" onclick="renameCategory('${c.replace(/'/g,"\\'")}')">${c}</div><button class="btn danger" onclick="deleteCategory('${c.replace(/'/g,"\\'")}')">✕</button></div>`).join('')}
+    <div class="row" style="margin-top:10px;"><input id="newCatName" placeholder="Nouvelle catégorie"></div>
+    <button class="btn ghost" onclick="addCategory()">Ajouter une catégorie</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Zone danger</h3>
     <button class="btn danger" style="width:100%;padding:14px;" onclick="resetAll()">Effacer toutes les données</button>
@@ -701,22 +724,70 @@ function closeCardModal(){ document.getElementById('cardOverlay').style.display=
 function renderCardSheet(){
   let carteList = DATA.recurring.filter(r=>r.type==='out' && r.paymentMethod==='carte' && recurringActiveInMonth(r,cardModalMonth));
   let validated = DATA.cardDefer[cardModalMonth] || [];
-  let totalValidated = carteList.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+r.amount,0);
+  let extras = DATA.cardExtras[cardModalMonth] || [];
+  let manual = DATA.cardManualTotal[cardModalMonth];
+  let isManual = manual!==undefined && manual!==null && manual!=='';
+  let categorized = carteList.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+r.amount,0) + extras.reduce((s,e)=>s+e.amount,0);
+  let displayedTotal = isManual ? parseFloat(manual) : categorized;
   document.getElementById('cardSheet').innerHTML = `
     <div class="handle"></div>
     <h3 class="blocktitle">💳 Carte du mois</h3>
     <h2 class="pagehead" style="margin-bottom:2px;">${monthLabel(cardModalMonth)}</h2>
-    <div class="num neg" style="font-size:20px;margin-bottom:6px;">-${fmt(totalValidated)} validé</div>
-    <div class="small" style="margin-bottom:14px;">Coche une dépense carte : elle compte pour ${monthLabel(cardModalMonth)}. Non cochée, elle ne compte pas du tout ce mois-ci.</div>
+    <div class="num neg" style="font-size:20px;margin-bottom:2px;">-${fmt(displayedTotal)} au total</div>
+    <div class="small" style="margin-bottom:14px;">${isManual ? 'Montant saisi manuellement (relevé bancaire réel).' : 'Calcul automatique (récurrentes cochées + achats ponctuels).'}</div>
     <div class="row" style="margin-bottom:14px;">
       <button class="btn ghost" onclick="openCardModal(shiftMonth(cardModalMonth,-1))">‹ ${monthLabel(shiftMonth(cardModalMonth,-1))}</button>
       <button class="btn ghost" onclick="openCardModal(shiftMonth(cardModalMonth,1))">${monthLabel(shiftMonth(cardModalMonth,1))} ›</button>
     </div>
+
+    <h3 class="blocktitle">Montant réel du relevé (optionnel)</h3>
+    <div class="small" style="margin-bottom:8px;">Si tu le saisis, c'est ce montant qui compte — pas de doublon avec les cases cochées ci-dessous.</div>
+    <div class="row">
+      <input id="cardManualInput" type="number" step="0.01" placeholder="Ex : 480.50" value="${isManual?manual:''}">
+      <button class="btn ghost" style="flex:0 0 auto;width:auto;padding:14px 16px;" onclick="saveCardManual()">Enregistrer</button>
+    </div>
+    ${isManual ? `<button class="btn danger" style="width:100%;margin-bottom:10px;" onclick="clearCardManual()">Revenir au calcul automatique</button>` : ''}
+
+    <h3 class="blocktitle" style="margin-top:10px;">Récurrentes carte ${isManual ? '<span class="small">(catégorisation seulement, déjà comptées dans le montant saisi)</span>' : ''}</h3>
     ${carteList.map(r=>{
       let on = validated.includes(r.id);
       return `<div class="list-item"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · -${fmt(r.amount)}</div></div><div class="check ${on?'on':''}" onclick="toggleDefer(${r.id})"></div></div>`;
-    }).join('') || '<div class="small">Aucune dépense taguée "Carte". Tague-en une dans Récurrent.</div>'}
+    }).join('') || '<div class="small">Aucune dépense taguée "Carte".</div>'}
+
+    <h3 class="blocktitle" style="margin-top:16px;">Achats ponctuels du mois</h3>
+    ${extras.map(e=>`<div class="list-item"><div class="item-main">${e.label}</div><div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(e.amount)}</span><button class="btn danger" onclick="delCardExtra(${e.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun.</div>'}
+    <div class="row" style="margin-top:10px;">
+      <input id="extraLabel" placeholder="Ex : Resto, Essence...">
+      <input id="extraAmount" type="number" step="0.01" placeholder="Montant">
+    </div>
+    <button class="btn ghost" onclick="addCardExtra()">Ajouter cet achat</button>
     <button class="btn primary" style="margin-top:16px;" onclick="closeCardModal(); render();">Fermer</button>`;
+}
+function saveCardManual(){
+  let val = document.getElementById('cardManualInput').value;
+  if(val==='') return;
+  DATA.cardManualTotal[cardModalMonth] = parseFloat(val);
+  save();
+  renderCardSheet();
+}
+function clearCardManual(){
+  delete DATA.cardManualTotal[cardModalMonth];
+  save();
+  renderCardSheet();
+}
+function addCardExtra(){
+  let label=document.getElementById('extraLabel').value.trim();
+  let amount=parseFloat(document.getElementById('extraAmount').value);
+  if(!label||!amount) return alert("Nom et montant requis.");
+  if(!DATA.cardExtras[cardModalMonth]) DATA.cardExtras[cardModalMonth]=[];
+  DATA.cardExtras[cardModalMonth].push({id:DATA.nextCardExtraId++, label, amount});
+  save();
+  renderCardSheet();
+}
+function delCardExtra(id){
+  DATA.cardExtras[cardModalMonth] = (DATA.cardExtras[cardModalMonth]||[]).filter(e=>e.id!==id);
+  save();
+  renderCardSheet();
 }
 function toggleDefer(recId){
   if(!DATA.cardDefer[cardModalMonth]) DATA.cardDefer[cardModalMonth]=[];
@@ -744,8 +815,15 @@ function addRec(){
   let startDate=document.getElementById('recStart').value || null;
   let endDate=document.getElementById('recEnd').value || null;
   let paymentMethod = type==='out' ? (window.__recPayment||'rib') : null;
+  let alsoLog = document.getElementById('recAlsoLog').checked;
   if(!label||!amount) return alert("Nom et montant requis.");
-  DATA.recurring.push({id:DATA.nextRecId++,label,type,accountId,category,amount,dayOfMonth,startDate,endDate,paymentMethod}); save(); render();
+  DATA.recurring.push({id:DATA.nextRecId++,label,type,accountId,category,amount,dayOfMonth,startDate,endDate,paymentMethod});
+  if(alsoLog){
+    let d = new Date();
+    let dateVal = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(Math.min(dayOfMonth,28)).padStart(2,'0');
+    DATA.transactions.push({id:DATA.nextTxId++,date:dateVal,accountId,type,category,amount,note:label+" (récurrent)"});
+  }
+  save(); render();
   window.__recPayment='rib';
 }
 function delRec(id){
@@ -783,6 +861,30 @@ function cleanStartFrom(){
   render();
   alert("Fait. Nouveau départ au "+cutoff+", soldes recalculés.");
 }
+function renameCategory(oldName){
+  let neu = prompt('Nouveau nom pour "'+oldName+'" :', oldName);
+  if(!neu) return;
+  neu = neu.trim();
+  if(!neu || neu===oldName) return;
+  if(DATA.categories.includes(neu)) return alert("Cette catégorie existe déjà.");
+  let idx = DATA.categories.indexOf(oldName);
+  if(idx>-1) DATA.categories[idx] = neu;
+  DATA.transactions.forEach(t=>{ if(t.category===oldName) t.category=neu; });
+  DATA.recurring.forEach(r=>{ if(r.category===oldName) r.category=neu; });
+  save(); render();
+}
+function deleteCategory(name){
+  if(!confirm('Supprimer la catégorie "'+name+'" de la liste ? Les mouvements déjà enregistrés garderont ce libellé.')) return;
+  DATA.categories = DATA.categories.filter(c=>c!==name);
+  save(); render();
+}
+function addCategory(){
+  let name = document.getElementById('newCatName').value.trim();
+  if(!name) return;
+  if(DATA.categories.includes(name)) return alert("Cette catégorie existe déjà.");
+  DATA.categories.push(name);
+  save(); render();
+}
 function resetAll(){
   if(!confirm("Tout effacer ? Irréversible (aussi sur le cloud).")) return;
   DATA={accounts:[{id:1,name:"Compte courant",balance:0}],categories:["Salaire","Loyer","Courses","Transport","Loisirs","Santé","Autre"],
@@ -797,7 +899,7 @@ function importFile(file){
     try{
       if(file.name.endsWith('.json')){
         const obj=JSON.parse(text);
-        if(obj.transactions && obj.accounts){ DATA=obj; if(!DATA.recurring) DATA.recurring=[]; if(!DATA.cardDefer) DATA.cardDefer={}; save(); msg.textContent="Sauvegarde chargée : "+DATA.transactions.length+" mouvements."; }
+        if(obj.transactions && obj.accounts){ DATA=obj; if(!DATA.recurring) DATA.recurring=[]; if(!DATA.cardDefer) DATA.cardDefer={}; if(!DATA.cardExtras) DATA.cardExtras={}; if(!DATA.cardManualTotal) DATA.cardManualTotal={}; if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1; save(); msg.textContent="Sauvegarde chargée : "+DATA.transactions.length+" mouvements."; }
         else msg.textContent="Fichier JSON non reconnu.";
       } else importCSVGeneric(text,msg);
       render();
