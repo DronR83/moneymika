@@ -508,7 +508,7 @@ function renderDash(){
   let txMois=DATA.transactions.filter(t=>t.date.slice(0,7)===currentMonth);
   let inMois=txMois.filter(t=>t.type==='in').reduce((s,t)=>s+t.amount,0);
   let outMois=txMois.filter(t=>t.type==='out').reduce((s,t)=>s+t.amount,0);
-  let recent=[...txMois].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  let recent=[...txMois].filter(t=>!t.sourceCardStatement).sort((a,b)=>b.date.localeCompare(a.date));
   let validatedAmount = cardTotalForMonth(currentMonth);
   let isManualCard = DATA.cardManualTotal[currentMonth]!==undefined && DATA.cardManualTotal[currentMonth]!==null && DATA.cardManualTotal[currentMonth]!=='';
   let report = balanceBeforeMonth(currentMonth);
@@ -788,7 +788,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v26 (tuile sorties réel enlevée, plus simple)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v27 (mouvements du mois : tout affiché, carte enlevée de la liste)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
