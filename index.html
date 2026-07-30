@@ -719,7 +719,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v22 (carte non cochée compte toujours + édition des récurrentes)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v23 (rafraîchissement complet forcé à chaque action carte)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -848,12 +848,14 @@ function saveCardManual(){
   save();
   ensureRecurringMaterialized(cardModalMonth);
   renderCardSheet();
+  render();
 }
 function clearCardManual(){
   delete DATA.cardManualTotal[cardModalMonth];
   save();
   ensureRecurringMaterialized(cardModalMonth);
   renderCardSheet();
+  render();
 }
 function addCardExtra(){
   let label=document.getElementById('extraLabel').value.trim();
@@ -864,12 +866,14 @@ function addCardExtra(){
   save();
   ensureRecurringMaterialized(cardModalMonth);
   renderCardSheet();
+  render();
 }
 function delCardExtra(id){
   DATA.cardExtras[cardModalMonth] = (DATA.cardExtras[cardModalMonth]||[]).filter(e=>e.id!==id);
   save();
   ensureRecurringMaterialized(cardModalMonth);
   renderCardSheet();
+  render();
 }
 function toggleDefer(recId){
   if(!DATA.cardDefer[cardModalMonth]) DATA.cardDefer[cardModalMonth]=[];
@@ -879,6 +883,7 @@ function toggleDefer(recId){
   save();
   ensureRecurringMaterialized(cardModalMonth);
   renderCardSheet();
+  render();
 }
 
 // ---------- ACTIONS ----------
