@@ -358,7 +358,13 @@ function computeBalance(accId){
   DATA.transactions.filter(t=>t.accountId==accId).forEach(t=>{ bal += t.type==='in'?t.amount:-t.amount; });
   return bal;
 }
-function totalBalance(){ return DATA.accounts.reduce((s,a)=>s+computeBalance(a.id),0); }
+function totalBalance(){
+  let bal = balanceBeforeMonth(currentMonth);
+  DATA.transactions.forEach(t=>{
+    if(t.date.slice(0,7)===currentMonth) bal += (t.type==='in'?t.amount:-t.amount);
+  });
+  return bal;
+}
 function monthLabel(mk){ let [y,m]=mk.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); }
 function shiftMonth(mk,delta){ let [y,m]=mk.split('-').map(Number); let d=new Date(y,m-1+delta,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 function nextMonthKey(mk){ return shiftMonth(mk,1); }
@@ -399,20 +405,32 @@ function recurringForMonth(mk){
 // mouvement par récurrente et par mois (identifié par sourceRecId), mis à jour si le montant change.
 function ensureRecurringMaterialized(mk){
   let changed = false;
+  let validated = DATA.cardDefer[mk] || [];
+  let manualVal = DATA.cardManualTotal[mk];
+  let manualSet = (manualVal!==undefined && manualVal!==null && manualVal!=='');
   DATA.recurring.forEach(r=>{
     if(!recurringActiveInMonth(r,mk)) return;
-    if(r.type==='out' && r.paymentMethod==='carte') return; // géré à part, via le relevé carte
+    let isCarte = (r.type==='out' && r.paymentMethod==='carte');
+    let checked = isCarte && validated.includes(r.id);
+    let foldIntoStatement = isCarte && (checked || manualSet);
+    if(foldIntoStatement){
+      // repliée dans le relevé carte : pas de ligne individuelle
+      let idx = DATA.transactions.findIndex(t=>t.sourceRecId===r.id && t.date.slice(0,7)===mk);
+      if(idx>-1){ DATA.transactions.splice(idx,1); changed=true; }
+      return;
+    }
+    // compte individuellement : RIB toujours, ou carte non cochée sans montant manuel
     let existing = DATA.transactions.find(t=>t.sourceRecId===r.id && t.date.slice(0,7)===mk);
     let dateVal = mk+'-'+String(Math.min(r.dayOfMonth||1,28)).padStart(2,'0');
     if(!existing){
-      DATA.transactions.push({id:DATA.nextTxId++, date:dateVal, accountId:r.accountId, type:r.type, category:r.category, amount:r.amount, note:r.label+' (auto)', sourceRecId:r.id});
+      DATA.transactions.push({id:DATA.nextTxId++, date:dateVal, accountId:r.accountId, type:r.type, category:r.category, amount:r.amount, note:r.label+(isCarte?' (carte, non validée)':' (auto)'), sourceRecId:r.id});
       changed = true;
     } else if(existing.amount!==r.amount || existing.category!==r.category || existing.accountId!==r.accountId){
       existing.amount=r.amount; existing.category=r.category; existing.accountId=r.accountId;
       changed = true;
     }
   });
-  // Relevé carte du mois = un seul mouvement représentant le total (manuel ou auto)
+  // Relevé carte du mois = un seul mouvement représentant le total (manuel, ou somme des cochées + ponctuels)
   let total = cardTotalForMonth(mk);
   let cardTx = DATA.transactions.find(t=>t.sourceCardStatement===true && t.date.slice(0,7)===mk);
   let defaultAccId = DATA.accounts[0]?.id;
@@ -488,7 +506,6 @@ function renderDash(){
   </div>
 
   <div class="cards">
-    <div class="card"><div class="lbl">Solde total</div><div class="val num accent">${fmt(totalBalance())}</div></div>
     <div class="card"><div class="lbl">Net réel du mois</div><div class="val num ${net>=0?'pos':'neg'}">${fmt(net)}</div></div>
     <div class="card clickable" onclick="openDetailModal('in')"><div class="lbl">Entrées réelles</div><div class="val num pos">+${fmt(inMois)}</div></div>
     <div class="card clickable" onclick="openDetailModal('out')"><div class="lbl">Sorties réelles</div><div class="val num neg">-${fmt(outMois)}</div></div>
@@ -701,7 +718,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v19 (case à cocher carte agrandie sur toute la ligne)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v21 (carte non cochée = sortie réelle directe, cochée = repliée dans le relevé)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
