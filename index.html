@@ -406,13 +406,11 @@ function recurringForMonth(mk){
 function ensureRecurringMaterialized(mk){
   let changed = false;
   let validated = DATA.cardDefer[mk] || [];
-  let manualVal = DATA.cardManualTotal[mk];
-  let manualSet = (manualVal!==undefined && manualVal!==null && manualVal!=='');
   DATA.recurring.forEach(r=>{
     if(!recurringActiveInMonth(r,mk)) return;
     let isCarte = (r.type==='out' && r.paymentMethod==='carte');
     let checked = isCarte && validated.includes(r.id);
-    let foldIntoStatement = isCarte && (checked || manualSet);
+    let foldIntoStatement = checked;
     if(foldIntoStatement){
       // repliée dans le relevé carte : pas de ligne individuelle
       let idx = DATA.transactions.findIndex(t=>t.sourceRecId===r.id && t.date.slice(0,7)===mk);
@@ -658,7 +656,7 @@ function renderRec(){
   return `
   <h2 class="pagehead">Récurrent</h2>
   <div class="cards"><div class="card"><div class="lbl">Revenus fixes / mois</div><div class="val num pos">+${fmt(sumIn)}</div></div><div class="card"><div class="lbl">Dépenses fixes / mois</div><div class="val num neg">-${fmt(sumOut)}</div></div></div>
-  <div class="panel"><h3 class="blocktitle">Ajouter un élément mensuel</h3>
+  <div class="panel"><h3 class="blocktitle" id="recFormTitle">Ajouter un élément mensuel</h3>
     <div class="row"><input id="recLabel" placeholder="Ex : Loyer, Salaire, Netflix"><select id="recType" onchange="toggleRecPaymentRow()"><option value="out">Sortie</option><option value="in">Entrée</option></select></div>
     <div class="row"><select id="recAcc">${accOpts}</select><select id="recCat">${catOpts}</select></div>
     <div class="row"><input id="recAmount" type="number" inputmode="decimal" step="0.01" placeholder="Montant"><input id="recDay" type="number" inputmode="numeric" min="1" max="28" placeholder="Jour (ex 5)"></div>
@@ -673,14 +671,17 @@ function renderRec(){
     </div>
     <div class="row"><div><div class="small" style="margin-bottom:4px;">Début (optionnel)</div><input id="recStart" type="date"></div><div><div class="small" style="margin-bottom:4px;">Fin (optionnel)</div><input id="recEnd" type="date"></div></div>
     <div class="small" style="margin-bottom:10px;">Compte automatiquement dès ce mois-ci, pas besoin de la rajouter à la main.</div>
-    <button class="btn primary" onclick="addRec()">Ajouter</button>
+    <div class="row">
+      <button class="btn primary" id="recSubmitBtn" onclick="addRec()">Ajouter</button>
+      <button class="btn ghost" id="recCancelBtn" style="display:none;" onclick="cancelEditRec()">Annuler</button>
+    </div>
   </div>
   <div class="panel"><h3 class="blocktitle">Revenus récurrents</h3>
     <div class="small" style="margin-bottom:8px;">Toujours comptabilisés automatiquement chaque mois.</div>
-    ${inList.map(r=>`<div class="list-item"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · ${accName(r.accountId)} · le ${r.dayOfMonth}${r.startDate?' · dès '+r.startDate:''}${r.endDate?" · jusqu\u00e0 "+r.endDate:""}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num pos">+${fmt(r.amount)}</span><button class="btn danger" onclick="delRec(${r.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun.</div>'}
+    ${inList.map(r=>`<div class="list-item"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · ${accName(r.accountId)} · le ${r.dayOfMonth}${r.startDate?' · dès '+r.startDate:''}${r.endDate?" · jusqu\u00e0 "+r.endDate:""}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num pos">+${fmt(r.amount)}</span><button class="btn ghost" style="width:auto;padding:8px 10px;" onclick="editRec(${r.id})">✎</button><button class="btn danger" onclick="delRec(${r.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun.</div>'}
   </div>
   <div class="panel"><h3 class="blocktitle">Dépenses récurrentes</h3>
-    ${outList.map(r=>`<div class="list-item"><div><div class="item-main">${r.label} <span class="tag">${r.paymentMethod==='carte'?'💳 Carte':'🏦 RIB'}</span></div><div class="item-sub">${r.category} · ${accName(r.accountId)} · le ${r.dayOfMonth}${r.startDate?' · dès '+r.startDate:''}${r.endDate?" · jusqu\u00e0 "+r.endDate:""} · ${r.paymentMethod==='carte'?'à valider chaque mois':'auto chaque mois'}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(r.amount)}</span><button class="btn danger" onclick="delRec(${r.id})">✕</button></div></div>`).join('') || '<div class="small">Aucune.</div>'}
+    ${outList.map(r=>`<div class="list-item"><div><div class="item-main">${r.label} <span class="tag">${r.paymentMethod==='carte'?'💳 Carte':'🏦 RIB'}</span></div><div class="item-sub">${r.category} · ${accName(r.accountId)} · le ${r.dayOfMonth}${r.startDate?' · dès '+r.startDate:''}${r.endDate?" · jusqu\u00e0 "+r.endDate:""} · ${r.paymentMethod==='carte'?'à valider chaque mois':'auto chaque mois'}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(r.amount)}</span><button class="btn ghost" style="width:auto;padding:8px 10px;" onclick="editRec(${r.id})">✎</button><button class="btn danger" onclick="delRec(${r.id})">✕</button></div></div>`).join('') || '<div class="small">Aucune.</div>'}
   </div>
   <div class="panel"><h3 class="blocktitle">💳 Carte du mois</h3>
     <div class="small" style="margin-bottom:10px;">Les dépenses taguées "Carte" ne comptent que si tu les valides ici, mois par mois. Les RIB comptent toujours automatiquement.</div>
@@ -718,7 +719,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v21 (carte non cochée = sortie réelle directe, cochée = repliée dans le relevé)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v22 (carte non cochée compte toujours + édition des récurrentes)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -824,7 +825,8 @@ function renderCardSheet(){
     </div>
     ${isManual ? `<button class="btn danger" style="width:100%;margin-bottom:10px;" onclick="clearCardManual()">Revenir au calcul automatique</button>` : ''}
 
-    <h3 class="blocktitle" style="margin-top:10px;">Récurrentes carte ${isManual ? '<span class="small">(catégorisation seulement, déjà comptées dans le montant saisi)</span>' : ''}</h3>
+    <h3 class="blocktitle" style="margin-top:10px;">Récurrentes carte</h3>
+    <div class="small" style="margin-bottom:8px;">Non cochée : compte comme une sortie normale. Cochée : sort de la liste et rejoint le relevé ci-dessus.</div>
     ${carteList.map(r=>{
       let on = validated.includes(r.id);
       return `<div class="list-item" style="cursor:pointer;" onclick="toggleDefer(${r.id})"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · -${fmt(r.amount)}</div></div><div class="check ${on?'on':''}"></div></div>`;
@@ -887,6 +889,31 @@ function addAccount(){
   DATA.accounts.push({id:DATA.nextAccId++,name,balance:bal}); save(); render();
 }
 function delTx(id){ DATA.transactions=DATA.transactions.filter(t=>t.id!==id); save(); render(); }
+let editingRecId = null;
+function editRec(id){
+  let r = DATA.recurring.find(x=>x.id===id);
+  if(!r) return;
+  editingRecId = id;
+  document.getElementById('recLabel').value = r.label;
+  document.getElementById('recType').value = r.type;
+  document.getElementById('recAcc').value = r.accountId;
+  document.getElementById('recCat').value = r.category;
+  document.getElementById('recAmount').value = r.amount;
+  document.getElementById('recDay').value = r.dayOfMonth;
+  document.getElementById('recStart').value = r.startDate || '';
+  document.getElementById('recEnd').value = r.endDate || '';
+  setRecPayment(r.paymentMethod || 'rib');
+  toggleRecPaymentRow();
+  document.getElementById('recFormTitle').textContent = 'Modifier "'+r.label+'"';
+  document.getElementById('recSubmitBtn').textContent = 'Enregistrer les modifications';
+  document.getElementById('recCancelBtn').style.display = 'block';
+  window.scrollTo(0,0);
+  document.getElementById('content').scrollTop = 0;
+}
+function cancelEditRec(){
+  editingRecId = null;
+  render();
+}
 function addRec(){
   let label=document.getElementById('recLabel').value.trim();
   let type=document.getElementById('recType').value;
@@ -898,7 +925,13 @@ function addRec(){
   let endDate=document.getElementById('recEnd').value || null;
   let paymentMethod = type==='out' ? (window.__recPayment||'rib') : null;
   if(!label||!amount) return alert("Nom et montant requis.");
-  DATA.recurring.push({id:DATA.nextRecId++,label,type,accountId,category,amount,dayOfMonth,startDate,endDate,paymentMethod});
+  if(editingRecId){
+    let r = DATA.recurring.find(x=>x.id===editingRecId);
+    if(r){ Object.assign(r,{label,type,accountId,category,amount,dayOfMonth,startDate,endDate,paymentMethod}); }
+    editingRecId = null;
+  } else {
+    DATA.recurring.push({id:DATA.nextRecId++,label,type,accountId,category,amount,dayOfMonth,startDate,endDate,paymentMethod});
+  }
   save();
   ensureRecurringMaterialized(currentMonth);
   render();
