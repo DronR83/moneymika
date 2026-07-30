@@ -701,7 +701,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v18 (nettoyage anciens doublons + rattrapage carte manuel)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v19 (case à cocher carte agrandie sur toute la ligne)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -810,7 +810,7 @@ function renderCardSheet(){
     <h3 class="blocktitle" style="margin-top:10px;">Récurrentes carte ${isManual ? '<span class="small">(catégorisation seulement, déjà comptées dans le montant saisi)</span>' : ''}</h3>
     ${carteList.map(r=>{
       let on = validated.includes(r.id);
-      return `<div class="list-item"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · -${fmt(r.amount)}</div></div><div class="check ${on?'on':''}" onclick="toggleDefer(${r.id})"></div></div>`;
+      return `<div class="list-item" style="cursor:pointer;" onclick="toggleDefer(${r.id})"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · -${fmt(r.amount)}</div></div><div class="check ${on?'on':''}"></div></div>`;
     }).join('') || '<div class="small">Aucune dépense taguée "Carte".</div>'}
 
     <h3 class="blocktitle" style="margin-top:16px;">Achats ponctuels du mois</h3>
