@@ -95,6 +95,18 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
 .seg button.active.out{background:rgba(255,107,107,.15);color:var(--red);}
 .seg button.active.in{background:rgba(61,220,132,.15);color:var(--green);}
 .list-item{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line-soft);border-radius:10px;transition:background .15s ease;margin:0 -4px;}
+
+.rec-card{display:flex;gap:12px;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px;}
+.rec-icon{width:42px;height:42px;border-radius:50%;background:var(--line-soft);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+.rec-body{flex:1;min-width:0;}
+.rec-title{font-size:14.5px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.rec-sub{font-size:12px;color:var(--sub);margin-top:2px;}
+.rec-dates{font-size:11px;color:var(--sub);margin-top:5px;display:flex;align-items:center;gap:5px;opacity:.85;}
+.rec-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;}
+.rec-actions{display:flex;gap:6px;}
+.rec-actions button{width:30px;height:30px;border-radius:9px;background:var(--panel);border:1px solid var(--line);color:var(--sub);font-size:13px;box-shadow:none;padding:0;}
+.rec-actions button:active{transform:scale(.9);}
+.rec-actions button.danger{color:var(--red);background:rgba(255,107,107,.1);border-color:rgba(255,107,107,.25);}
 .list-item:active{background:rgba(201,163,76,.06);}
 .list-item:last-child{border-bottom:none;}
 .item-main{font-size:15px;font-weight:500;}
@@ -279,6 +291,7 @@ async function doLogin(){
       if(!DATA.cardDefer) DATA.cardDefer={};
       if(!DATA.cardExtras) DATA.cardExtras={};
       if(!DATA.cardManualTotal) DATA.cardManualTotal={};
+      if(!DATA.recurringOverrides) DATA.recurringOverrides={};
       if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1;
     } else {
       const {key, salt} = await deriveKey(password);
@@ -334,12 +347,13 @@ const LOCAL_KEY = "moneymika_local_cache";
 let DATA = loadLocal() || {
   accounts:[{id:1,name:"Compte courant",balance:0}],
   categories:["Salaire","Loyer","Courses","Transport","Loisirs","Santé","Autre"],
-  transactions:[], recurring:[], cardDefer:{}, cardExtras:{}, cardManualTotal:{},
+  transactions:[], recurring:[], cardDefer:{}, cardExtras:{}, cardManualTotal:{}, recurringOverrides:{},
   nextTxId:1, nextAccId:2, nextRecId:1, nextCardExtraId:1
 };
 if(!DATA.cardDefer) DATA.cardDefer={};
 if(!DATA.cardExtras) DATA.cardExtras={};
 if(!DATA.cardManualTotal) DATA.cardManualTotal={};
+if(!DATA.recurringOverrides) DATA.recurringOverrides={};
 if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1;
 function saveLocal(){ localStorage.setItem(LOCAL_KEY, JSON.stringify(DATA)); }
 function loadLocal(){ try{ return JSON.parse(localStorage.getItem(LOCAL_KEY)); }catch(e){ return null; } }
@@ -373,15 +387,19 @@ function recurringActiveInMonth(r, mk){
   if(r.endDate && mk > r.endDate.slice(0,7)) return false;
   return true;
 }
+// Montant réel à utiliser pour une récurrente sur un mois précis : le montant de base,
+// sauf si un montant spécifique à ce mois a été saisi (n'affecte pas les autres mois).
+function recurringEffectiveAmount(r, mk){
+  if(DATA.recurringOverrides[mk] && DATA.recurringOverrides[mk][r.id]!==undefined) return DATA.recurringOverrides[mk][r.id];
+  return r.amount;
+}
 // Total de la carte pour un mois : si un montant a été saisi manuellement, il fait foi
 // (les récurrentes cochées et les ponctuels ne s'additionnent plus dessus, pour éviter les doublons).
 // Sinon, calcul automatique = récurrentes carte cochées + achats ponctuels.
 function cardAutoTotal(mk){
   let validated = DATA.cardDefer[mk] || [];
   let carte = DATA.recurring.filter(r=>r.type==='out' && r.paymentMethod==='carte' && recurringActiveInMonth(r,mk));
-  let sum = carte.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+r.amount,0);
-  let extras = DATA.cardExtras[mk] || [];
-  sum += extras.reduce((s,e)=>s+e.amount,0);
+  let sum = carte.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+recurringEffectiveAmount(r,mk),0);
   return sum;
 }
 function cardTotalForMonth(mk){
@@ -393,9 +411,11 @@ function recurringForMonth(mk){
   let inSum=0, outSum=0;
   DATA.recurring.forEach(r=>{
     if(!recurringActiveInMonth(r,mk)) return;
-    if(r.type==='in'){ inSum += r.amount; return; }
-    if(r.paymentMethod!=='carte'){ outSum += r.amount; }
+    if(r.type==='in'){ inSum += recurringEffectiveAmount(r,mk); return; }
+    if(r.paymentMethod!=='carte'){ outSum += recurringEffectiveAmount(r,mk); }
   });
+  let extras = DATA.cardExtras[mk] || [];
+  outSum += extras.reduce((s,e)=>s+e.amount,0);
   outSum += cardTotalForMonth(mk);
   return {inSum, outSum};
 }
@@ -403,32 +423,50 @@ function recurringForMonth(mk){
 // Transforme les récurrentes RIB (auto) et le total carte du mois en VRAIS mouvements,
 // pour qu'ils comptent dans Entrées/Sorties/Net réel et le solde. Sans doublon : un seul
 // mouvement par récurrente et par mois (identifié par sourceRecId), mis à jour si le montant change.
+// Nettoie aussi les vieux mouvements si la récurrente n'est plus active ce mois (date changée).
 function ensureRecurringMaterialized(mk){
   let changed = false;
   let validated = DATA.cardDefer[mk] || [];
   DATA.recurring.forEach(r=>{
-    if(!recurringActiveInMonth(r,mk)) return;
+    let active = recurringActiveInMonth(r,mk);
     let isCarte = (r.type==='out' && r.paymentMethod==='carte');
     let checked = isCarte && validated.includes(r.id);
-    let foldIntoStatement = checked;
-    if(foldIntoStatement){
-      // repliée dans le relevé carte : pas de ligne individuelle
-      let idx = DATA.transactions.findIndex(t=>t.sourceRecId===r.id && t.date.slice(0,7)===mk);
-      if(idx>-1){ DATA.transactions.splice(idx,1); changed=true; }
+    let shouldExist = active && !checked;
+    let existing = DATA.transactions.find(t=>t.sourceRecId===r.id && t.date.slice(0,7)===mk);
+    if(!shouldExist){
+      // pas (ou plus) active ce mois, ou repliée dans le relevé : supprime le vieux mouvement s'il existe
+      if(existing){ DATA.transactions.splice(DATA.transactions.indexOf(existing),1); changed=true; }
       return;
     }
-    // compte individuellement : RIB toujours, ou carte non cochée sans montant manuel
-    let existing = DATA.transactions.find(t=>t.sourceRecId===r.id && t.date.slice(0,7)===mk);
+    let effAmount = recurringEffectiveAmount(r,mk);
     let dateVal = mk+'-'+String(Math.min(r.dayOfMonth||1,28)).padStart(2,'0');
     if(!existing){
-      DATA.transactions.push({id:DATA.nextTxId++, date:dateVal, accountId:r.accountId, type:r.type, category:r.category, amount:r.amount, note:r.label+(isCarte?' (carte, non validée)':' (auto)'), sourceRecId:r.id});
+      DATA.transactions.push({id:DATA.nextTxId++, date:dateVal, accountId:r.accountId, type:r.type, category:r.category, amount:effAmount, note:r.label+(isCarte?' (carte, non validée)':' (auto)'), sourceRecId:r.id});
       changed = true;
-    } else if(existing.amount!==r.amount || existing.category!==r.category || existing.accountId!==r.accountId){
-      existing.amount=r.amount; existing.category=r.category; existing.accountId=r.accountId;
+    } else if(existing.amount!==effAmount || existing.category!==r.category || existing.accountId!==r.accountId){
+      existing.amount=effAmount; existing.category=r.category; existing.accountId=r.accountId;
       changed = true;
     }
   });
-  // Relevé carte du mois = un seul mouvement représentant le total (manuel, ou somme des cochées + ponctuels)
+  // Achats ponctuels carte = mouvements séparés (plus repliés dans le relevé)
+  let extras = DATA.cardExtras[mk] || [];
+  extras.forEach(e=>{
+    let existing = DATA.transactions.find(t=>t.sourceCardExtraId===e.id && t.date.slice(0,7)===mk);
+    let dateVal = mk+'-'+String(new Date(mk+'-01').getDate()||1).padStart(2,'0');
+    if(!existing){
+      DATA.transactions.push({id:DATA.nextTxId++, date:mk+'-15', accountId:DATA.accounts[0]?.id, type:'out', category:'Carte', amount:e.amount, note:e.label+' (ponctuel)', sourceCardExtraId:e.id});
+      changed = true;
+    } else if(existing.amount!==e.amount){
+      existing.amount = e.amount;
+      changed = true;
+    }
+  });
+  // supprime mouvements de ponctuels effacés
+  let extraIds = extras.map(e=>e.id);
+  let beforeLen = DATA.transactions.length;
+  DATA.transactions = DATA.transactions.filter(t=>!(t.sourceCardExtraId && t.date.slice(0,7)===mk && !extraIds.includes(t.sourceCardExtraId)));
+  if(DATA.transactions.length!==beforeLen) changed=true;
+  // Relevé carte du mois = un seul mouvement représentant le total (manuel, ou somme des cochées)
   let total = cardTotalForMonth(mk);
   let cardTx = DATA.transactions.find(t=>t.sourceCardStatement===true && t.date.slice(0,7)===mk);
   let defaultAccId = DATA.accounts[0]?.id;
@@ -646,13 +684,44 @@ function renderTx(){
     <button class="btn ghost" onclick="addAccount()">Ajouter un compte</button>
   </div>`;
 }
+function categoryIcon(cat){
+  const c = (cat||'').toLowerCase();
+  const map = {
+    'salaire':'💼','loyer':'🏠','courses':'🛒','transport':'🚗','loisirs':'🎮','santé':'⚕️',
+    'banque':'🏦','cloud':'☁️','streaming':'📺','credit':'💳','crédit':'💳','forfait':'📱',
+    'énergie':'⚡','energie':'⚡','assurance':'☂️','impôts':'🏛️','impots':'🏛️','maison':'🏠',
+    'électroménager':'🔌','vente':'🛍️'
+  };
+  return map[c] || '💠';
+}
 function renderRec(){
   let accOpts=DATA.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
   let catOpts=DATA.categories.map(c=>`<option value="${c}">${c}</option>`).join('');
   let inList=DATA.recurring.filter(r=>r.type==='in');
   let outList=DATA.recurring.filter(r=>r.type==='out');
-  let sumIn=inList.reduce((s,r)=>s+r.amount,0);
-  let sumOut=outList.reduce((s,r)=>s+r.amount,0);
+  let sumIn=inList.reduce((s,r)=>s+recurringEffectiveAmount(r,currentMonth),0);
+  let sumOut=outList.reduce((s,r)=>s+recurringEffectiveAmount(r,currentMonth),0);
+  function recCard(r, positive){
+    let amt = recurringEffectiveAmount(r, currentMonth);
+    let overridden = DATA.recurringOverrides[currentMonth] && DATA.recurringOverrides[currentMonth][r.id]!==undefined;
+    let tag = r.type==='out' ? (r.paymentMethod==='carte' ? '💳 Carte · à valider' : '🏦 RIB · auto') : '💼 Auto';
+    return `<div class="rec-card">
+      <div class="rec-icon">${categoryIcon(r.category)}</div>
+      <div class="rec-body">
+        <div class="rec-title">${r.label}${overridden?' <span class="tag">modifié ce mois</span>':''}</div>
+        <div class="rec-sub">${r.category} · ${accName(r.accountId)} · ${tag}</div>
+        <div class="rec-dates">📅 Du ${r.startDate||'origine'} au ${r.endDate||'—'} · le ${r.dayOfMonth}</div>
+      </div>
+      <div class="rec-right">
+        <div class="num ${positive?'pos':'neg'}" style="font-size:15px;">${positive?'+':'-'}${fmt(amt)}</div>
+        <div class="rec-actions">
+          <button title="Modifier le montant de ce mois seulement" onclick="overrideRecurringMonth(${r.id})">📅</button>
+          <button title="Modifier partout" onclick="editRec(${r.id})">✎</button>
+          <button class="danger" title="Supprimer" onclick="delRec(${r.id})">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }
   return `
   <h2 class="pagehead">Récurrent</h2>
   <div class="cards"><div class="card"><div class="lbl">Revenus fixes / mois</div><div class="val num pos">+${fmt(sumIn)}</div></div><div class="card"><div class="lbl">Dépenses fixes / mois</div><div class="val num neg">-${fmt(sumOut)}</div></div></div>
@@ -677,14 +746,14 @@ function renderRec(){
     </div>
   </div>
   <div class="panel"><h3 class="blocktitle">Revenus récurrents</h3>
-    <div class="small" style="margin-bottom:8px;">Toujours comptabilisés automatiquement chaque mois.</div>
-    ${inList.map(r=>`<div class="list-item"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · ${accName(r.accountId)} · le ${r.dayOfMonth}${r.startDate?' · dès '+r.startDate:''}${r.endDate?" · jusqu\u00e0 "+r.endDate:""}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num pos">+${fmt(r.amount)}</span><button class="btn ghost" style="width:auto;padding:8px 10px;" onclick="editRec(${r.id})">✎</button><button class="btn danger" onclick="delRec(${r.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun.</div>'}
+    <div class="small" style="margin-bottom:10px;">Toujours comptabilisés automatiquement chaque mois.</div>
+    ${inList.map(r=>recCard(r,true)).join('') || '<div class="small">Aucun.</div>'}
   </div>
   <div class="panel"><h3 class="blocktitle">Dépenses récurrentes</h3>
-    ${outList.map(r=>`<div class="list-item"><div><div class="item-main">${r.label} <span class="tag">${r.paymentMethod==='carte'?'💳 Carte':'🏦 RIB'}</span></div><div class="item-sub">${r.category} · ${accName(r.accountId)} · le ${r.dayOfMonth}${r.startDate?' · dès '+r.startDate:''}${r.endDate?" · jusqu\u00e0 "+r.endDate:""} · ${r.paymentMethod==='carte'?'à valider chaque mois':'auto chaque mois'}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(r.amount)}</span><button class="btn ghost" style="width:auto;padding:8px 10px;" onclick="editRec(${r.id})">✎</button><button class="btn danger" onclick="delRec(${r.id})">✕</button></div></div>`).join('') || '<div class="small">Aucune.</div>'}
+    ${outList.map(r=>recCard(r,false)).join('') || '<div class="small">Aucune.</div>'}
   </div>
   <div class="panel"><h3 class="blocktitle">💳 Carte du mois</h3>
-    <div class="small" style="margin-bottom:10px;">Les dépenses taguées "Carte" ne comptent que si tu les valides ici, mois par mois. Les RIB comptent toujours automatiquement.</div>
+    <div class="small" style="margin-bottom:10px;">Les dépenses taguées "Carte" comptent en sortie réelle tant que tu ne les valides pas ici. Les RIB comptent toujours automatiquement.</div>
     <button class="btn ghost" onclick="openCardModal(currentMonth)">Ouvrir pour ${monthLabel(currentMonth)}</button>
   </div>`;
 }
@@ -719,7 +788,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v23 (rafraîchissement complet forcé à chaque action carte)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v25 (nettoie vieux mouvements si date change + ponctuels séparés)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -943,9 +1012,27 @@ function addRec(){
   window.__recPayment='rib';
 }
 function delRec(id){
-  DATA.recurring=DATA.recurring.filter(r=>r.id!==id);
+  let r = DATA.recurring.find(x=>x.id===id);
+  let nom = r ? r.label : "cette récurrente";
+  if(!confirm('Supprimer "'+nom+'" ? Elle ne se reproduira plus les mois suivants. Cette action est définitive.')) return;
+  DATA.recurring=DATA.recurring.filter(x=>x.id!==id);
   Object.keys(DATA.cardDefer).forEach(mk=>{ DATA.cardDefer[mk]=DATA.cardDefer[mk].filter(rid=>rid!==id); });
+  Object.keys(DATA.recurringOverrides).forEach(mk=>{ delete DATA.recurringOverrides[mk][id]; });
   DATA.transactions = DATA.transactions.filter(t=>t.sourceRecId!==id);
+  save();
+  ensureRecurringMaterialized(currentMonth);
+  render();
+}
+function overrideRecurringMonth(id){
+  let r = DATA.recurring.find(x=>x.id===id);
+  if(!r) return;
+  let current = recurringEffectiveAmount(r, currentMonth);
+  let val = prompt('Nouveau montant pour "'+r.label+'" — uniquement pour '+monthLabel(currentMonth)+'. Les autres mois ne changent pas.', current);
+  if(val===null) return;
+  let amount = parseFloat(String(val).replace(',','.'));
+  if(isNaN(amount)) return alert("Montant invalide.");
+  if(!DATA.recurringOverrides[currentMonth]) DATA.recurringOverrides[currentMonth] = {};
+  DATA.recurringOverrides[currentMonth][id] = amount;
   save();
   ensureRecurringMaterialized(currentMonth);
   render();
@@ -1027,7 +1114,7 @@ function importFile(file){
     try{
       if(file.name.endsWith('.json')){
         const obj=JSON.parse(text);
-        if(obj.transactions && obj.accounts){ DATA=obj; if(!DATA.recurring) DATA.recurring=[]; if(!DATA.cardDefer) DATA.cardDefer={}; if(!DATA.cardExtras) DATA.cardExtras={}; if(!DATA.cardManualTotal) DATA.cardManualTotal={}; if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1; save(); msg.textContent="Sauvegarde chargée : "+DATA.transactions.length+" mouvements."; }
+        if(obj.transactions && obj.accounts){ DATA=obj; if(!DATA.recurring) DATA.recurring=[]; if(!DATA.cardDefer) DATA.cardDefer={}; if(!DATA.cardExtras) DATA.cardExtras={}; if(!DATA.cardManualTotal) DATA.cardManualTotal={}; if(!DATA.recurringOverrides) DATA.recurringOverrides={}; if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1; save(); msg.textContent="Sauvegarde chargée : "+DATA.transactions.length+" mouvements."; }
         else msg.textContent="Fichier JSON non reconnu.";
       } else importCSVGeneric(text,msg);
       render();
