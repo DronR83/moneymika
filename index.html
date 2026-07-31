@@ -784,7 +784,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v28 (net réel enlevé, calcul simple : report + entrées - carte - mouvements)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v29 (carte : total des cochées affiché en bas)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -896,6 +896,7 @@ function renderCardSheet(){
       let on = validated.includes(r.id);
       return `<div class="list-item" style="cursor:pointer;" onclick="toggleDefer(${r.id})"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · -${fmt(r.amount)}</div></div><div class="check ${on?'on':''}"></div></div>`;
     }).join('') || '<div class="small">Aucune dépense taguée "Carte".</div>'}
+    <div class="num neg" style="font-size:14px;margin-top:8px;">Déjà comptabilisé (cochées) : -${fmt(carteList.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+r.amount,0))}</div>
 
     <h3 class="blocktitle" style="margin-top:16px;">Achats ponctuels du mois</h3>
     ${extras.map(e=>`<div class="list-item"><div class="item-main">${e.label}</div><div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(e.amount)}</span><button class="btn danger" onclick="delCardExtra(${e.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun.</div>'}
