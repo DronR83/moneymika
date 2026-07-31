@@ -327,6 +327,16 @@ function unlock(){
   document.getElementById('app').style.display="flex";
   materializeUpToCurrent();
   render();
+  if(window.__pendingDriveUpload){
+    window.__pendingDriveUpload = false;
+    VIEW = 'io';
+    render();
+    setTimeout(()=>{
+      const token = sessionStorage.getItem('gdrive_token');
+      const msg = document.getElementById('driveMsg');
+      if(token) uploadJSONToDrive(token, msg);
+    }, 300);
+  }
 }
 function materializeUpToCurrent(){
   let target = currentMonth;
@@ -785,7 +795,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v35 (bug connexion Drive corrigé, message erreur clair)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v36 (Drive par redirection, marche en mode appli iPhone)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -1039,43 +1049,41 @@ function overrideRecurringMonth(id){
   render();
 }
 function setPrevisMonths(){ window.__previsMonths=document.getElementById('previsMonths').value; render(); }
-// ===== SAUVEGARDE MANUELLE GOOGLE DRIVE =====
-// Remplace par ton propre Client ID (console.google.com > APIs & Services > Identifiants > ID client OAuth > Application Web)
+// ===== SAUVEGARDE MANUELLE GOOGLE DRIVE (par redirection, marche en mode appli) =====
 const GOOGLE_DRIVE_CLIENT_ID = "964719076221-em8ds3m44vbi195bpp95khneeto7ljj5.apps.googleusercontent.com";
-let driveTokenClient = null;
+function driveRedirectUri(){ return window.location.origin + window.location.pathname; }
 function backupToDrive(){
   const msg = document.getElementById('driveMsg');
   if(GOOGLE_DRIVE_CLIENT_ID.includes("REMPLACE_MOI")){
     msg.textContent = "Configuration Google Drive manquante (Client ID à renseigner).";
     return;
   }
-  if(typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2){
-    msg.textContent = "Google pas encore chargé. Attends 2 secondes et réessaie.";
-    return;
-  }
-  try{
-    msg.textContent = "Connexion à Google...";
-    if(!driveTokenClient){
-      driveTokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_DRIVE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/drive.file',
-        callback: (resp)=>{
-          if(resp.error){ msg.textContent = "Erreur : "+resp.error; return; }
-          uploadJSONToDrive(resp.access_token, msg);
-        },
-        error_callback: (err)=>{
-          msg.textContent = "Erreur connexion : "+(err.type||err.message||"inconnue");
-        }
-      });
+  const cached = sessionStorage.getItem('gdrive_token');
+  if(cached){ uploadJSONToDrive(cached, msg); return; }
+  msg.textContent = "Redirection vers Google...";
+  const redirectUri = encodeURIComponent(driveRedirectUri());
+  const scope = encodeURIComponent('https://www.googleapis.com/auth/drive.file');
+  const url = "https://accounts.google.com/o/oauth2/v2/auth?client_id="+GOOGLE_DRIVE_CLIENT_ID+
+    "&redirect_uri="+redirectUri+"&response_type=token&scope="+scope+
+    "&include_granted_scopes=true&prompt=consent&state=moneymika_drive";
+  window.location.href = url;
+}
+function checkDriveRedirect(){
+  if(window.location.hash.includes('access_token')){
+    const params = new URLSearchParams(window.location.hash.substring(1));
+    const token = params.get('access_token');
+    const state = params.get('state');
+    history.replaceState(null,'',window.location.pathname);
+    if(token && state==='moneymika_drive'){
+      sessionStorage.setItem('gdrive_token', token);
+      window.__pendingDriveUpload = true;
     }
-    driveTokenClient.requestAccessToken();
-  }catch(e){
-    msg.textContent = "Erreur : "+e.message;
   }
 }
+checkDriveRedirect();
 async function uploadJSONToDrive(accessToken, msg){
   try{
-    msg.textContent = "Envoi vers Drive...";
+    if(msg) msg.textContent = "Envoi vers Drive...";
     const today = todayStr();
     const fileName = "moneymika-sauvegarde-"+today+".json";
     const content = JSON.stringify(DATA, null, 2);
@@ -1090,10 +1098,15 @@ async function uploadJSONToDrive(accessToken, msg){
       headers: { Authorization: "Bearer "+accessToken, "Content-Type": "multipart/related; boundary="+boundary },
       body
     });
+    if(res.status===401){
+      sessionStorage.removeItem('gdrive_token');
+      if(msg) msg.textContent = "Session expirée, reclique pour te reconnecter.";
+      return;
+    }
     if(!res.ok) throw new Error("Échec envoi ("+res.status+")");
-    msg.textContent = "✓ Sauvegardé sur Drive : "+fileName;
+    if(msg) msg.textContent = "✓ Sauvegardé sur Drive : "+fileName;
   }catch(e){
-    msg.textContent = "Erreur : "+e.message;
+    if(msg) msg.textContent = "Erreur : "+e.message;
   }
 }
 function exportJSON(){
