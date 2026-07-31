@@ -795,7 +795,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v36 (Drive par redirection, marche en mode appli iPhone)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v37 (redirect_uri sans slash final, corrige mismatch)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
@@ -1051,7 +1051,12 @@ function overrideRecurringMonth(id){
 function setPrevisMonths(){ window.__previsMonths=document.getElementById('previsMonths').value; render(); }
 // ===== SAUVEGARDE MANUELLE GOOGLE DRIVE (par redirection, marche en mode appli) =====
 const GOOGLE_DRIVE_CLIENT_ID = "964719076221-em8ds3m44vbi195bpp95khneeto7ljj5.apps.googleusercontent.com";
-function driveRedirectUri(){ return window.location.origin + window.location.pathname; }
+function driveRedirectUri(){
+  let p = window.location.pathname;
+  if(p==='/'||p==='') return window.location.origin;
+  if(p.endsWith('/')) p = p.slice(0,-1);
+  return window.location.origin + p;
+}
 function backupToDrive(){
   const msg = document.getElementById('driveMsg');
   if(GOOGLE_DRIVE_CLIENT_ID.includes("REMPLACE_MOI")){
