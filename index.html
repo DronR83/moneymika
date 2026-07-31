@@ -507,15 +507,12 @@ function renderDash(){
   ensureRecurringMaterialized(currentMonth);
   let txMois=DATA.transactions.filter(t=>t.date.slice(0,7)===currentMonth);
   let inMois=txMois.filter(t=>t.type==='in').reduce((s,t)=>s+t.amount,0);
-  let outMois=txMois.filter(t=>t.type==='out').reduce((s,t)=>s+t.amount,0);
-  let recent=[...txMois].filter(t=>!t.sourceCardStatement).sort((a,b)=>b.date.localeCompare(a.date));
+  let recent=[...txMois].filter(t=>!t.sourceCardStatement && t.type==='out').sort((a,b)=>b.date.localeCompare(a.date));
+  let mvtSum = recent.reduce((s,t)=>s+t.amount,0);
   let validatedAmount = cardTotalForMonth(currentMonth);
   let isManualCard = DATA.cardManualTotal[currentMonth]!==undefined && DATA.cardManualTotal[currentMonth]!==null && DATA.cardManualTotal[currentMonth]!=='';
   let report = balanceBeforeMonth(currentMonth);
-  let net = inMois-outMois;
-  let finMois = report+net;
-  let barTotal = Math.abs(inMois)+Math.abs(outMois);
-  let pctDep = barTotal>0 ? Math.min(100, outMois/barTotal*100) : 0;
+  let finMois = report + inMois - validatedAmount - mvtSum;
   return `
   <div class="month-nav"><button onclick="changeMonth(-1)">‹</button><div class="m-label" onclick="openMonthPicker()" style="cursor:pointer;">${monthLabel(currentMonth)} ▾</div><button onclick="changeMonth(1)">›</button></div>
 
@@ -526,32 +523,31 @@ function renderDash(){
       <span class="num accent">${fmt(report)}</span>
     </div>
     <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line-soft);">
-      <span class="small">Revenus</span>
+      <span class="small">Entrées réelles</span>
       <span class="num pos">+${fmt(inMois)}</span>
     </div>
     <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line-soft);">
-      <span class="small">Dépenses</span>
-      <span class="num neg">-${fmt(outMois)}</span>
+      <span class="small">Carte du mois</span>
+      <span class="num neg">-${fmt(validatedAmount)}</span>
     </div>
-    <div style="margin:14px 0 8px;background:var(--line-soft);border-radius:8px;height:8px;overflow:hidden;display:flex;">
-      <div style="height:8px;background:var(--green);width:${100-pctDep}%;"></div>
-      <div style="height:8px;background:var(--red);width:${pctDep}%;"></div>
+    <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line-soft);">
+      <span class="small">Mouvements du mois</span>
+      <span class="num neg">-${fmt(mvtSum)}</span>
     </div>
-    <div class="small" style="margin-bottom:2px;">Solde estimé fin de mois</div>
+    <div class="small" style="margin:10px 0 2px;">Solde estimé fin de mois</div>
     <div class="num ${finMois>=0?'accent':'neg'}" style="font-size:26px;">${fmt(finMois)}</div>
   </div>
 
   <div class="cards">
-    <div class="card"><div class="lbl">Net réel du mois</div><div class="val num ${net>=0?'pos':'neg'}">${fmt(net)}</div></div>
-    <div class="card clickable" onclick="openDetailModal('in')"><div class="lbl">Entrées réelles</div><div class="val num pos">+${fmt(inMois)}</div></div>
+    <div class="card clickable" onclick="openDetailModal('in')" style="grid-column:1/3;"><div class="lbl">Entrées réelles</div><div class="val num pos">+${fmt(inMois)}</div></div>
     <div class="card clickable" onclick="openCardModal(currentMonth)" style="grid-column:1/3;">
       <div class="lbl">💳 Carte du mois — ${monthLabel(currentMonth)}</div>
       <div class="val num neg">-${fmt(validatedAmount)} <span class="small" style="font-family:var(--sans);">${isManualCard?'montant saisi':'calcul auto'}</span></div>
     </div>
   </div>
-  <div class="small" style="text-align:center;margin:-8px 0 14px;">Net réel = Entrées + Mouvements du mois + Carte</div>
   <div class="panel"><h3 class="blocktitle">Mouvements du mois</h3>
-    ${recent.map(t=>`<div class="list-item"><div><div class="item-main">${t.category} · ${accName(t.accountId)}${(t.sourceRecId||t.sourceCardStatement)?' <span class="tag">auto</span>':''}</div><div class="item-sub">${t.date}${t.note?' — '+t.note:''}</div></div><div class="num ${t.type==='in'?'pos':'neg'}">${t.type==='in'?'+':'-'}${fmt(t.amount)}</div></div>`).join('') || '<div class="small">Rien ce mois-ci.</div>'}
+    <div class="num neg" style="font-size:19px;margin-bottom:12px;">-${fmt(mvtSum)} au total</div>
+    ${recent.map(t=>`<div class="list-item"><div><div class="item-main">${t.category} · ${accName(t.accountId)}${t.sourceRecId?' <span class="tag">auto</span>':''}</div><div class="item-sub">${t.date}${t.note?' — '+t.note:''}</div></div><div class="num neg">-${fmt(t.amount)}</div></div>`).join('') || '<div class="small">Rien ce mois-ci.</div>'}
   </div>`;
 }
 function changeMonth(delta){ currentMonth = shiftMonth(currentMonth, delta); render(); }
@@ -788,7 +784,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v27 (mouvements du mois : tout affiché, carte enlevée de la liste)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v28 (net réel enlevé, calcul simple : report + entrées - carte - mouvements)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
