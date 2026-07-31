@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#0b0d12">
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
@@ -150,7 +151,7 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
     <div class="row"><input id="loginEmail" type="email" placeholder="Email" autocomplete="username"></div>
     <div class="row"><input id="loginPassword" type="password" placeholder="Mot de passe (6 car. min)" autocomplete="current-password"></div>
     <button class="btn primary" id="loginBtn" onclick="doLogin()">Se connecter</button>
-    <div class="small">Première fois ? Entre l'email et le mot de passe de ton choix : ton compte est créé automatiquement. Ce mot de passe sert aussi à chiffrer tes données — retiens-le bien, il ne peut pas être récupéré.</div>
+    
   </div>
   <div id="lockSpinner">Connexion…</div>
 </div>
@@ -441,7 +442,7 @@ function ensureRecurringMaterialized(mk){
     let effAmount = recurringEffectiveAmount(r,mk);
     let dateVal = mk+'-'+String(Math.min(r.dayOfMonth||1,28)).padStart(2,'0');
     if(!existing){
-      DATA.transactions.push({id:DATA.nextTxId++, date:dateVal, accountId:r.accountId, type:r.type, category:r.category, amount:effAmount, note:r.label+(isCarte?' (carte, non validée)':' (auto)'), sourceRecId:r.id});
+      DATA.transactions.push({id:DATA.nextTxId++, date:dateVal, accountId:r.accountId, type:r.type, category:r.category, amount:effAmount, note:r.label+(isCarte?' (Carte)':' (RIB)'), sourceRecId:r.id});
       changed = true;
     } else if(existing.amount!==effAmount || existing.category!==r.category || existing.accountId!==r.accountId){
       existing.amount=effAmount; existing.category=r.category; existing.accountId=r.accountId;
@@ -547,7 +548,7 @@ function renderDash(){
   </div>
   <div class="panel"><h3 class="blocktitle">Mouvements du mois</h3>
     <div class="num neg" style="font-size:19px;margin-bottom:12px;">-${fmt(mvtSum)} au total</div>
-    ${recent.map(t=>`<div class="list-item"><div><div class="item-main">${t.category} · ${accName(t.accountId)}${t.sourceRecId?' <span class="tag">auto</span>':''}</div><div class="item-sub">${t.date}${t.note?' — '+t.note:''}</div></div><div class="num neg">-${fmt(t.amount)}</div></div>`).join('') || '<div class="small">Rien ce mois-ci.</div>'}
+    ${recent.map(t=>`<div class="rec-card" style="margin-bottom:8px;padding:12px;"><div class="rec-icon" style="width:36px;height:36px;font-size:16px;">${categoryIcon(t.category)}</div><div class="rec-body"><div class="rec-title" style="font-size:14px;">${t.category}</div><div class="rec-sub">${t.note?t.note.replace(/ \((RIB|Carte)\)$/,'')+' · ':''}${t.date}</div></div><div class="num neg" style="font-size:14.5px;padding-top:2px;">-${fmt(t.amount)}</div></div>`).join('') || '<div class="small">Rien ce mois-ci.</div>'}
   </div>`;
 }
 function changeMonth(delta){ currentMonth = shiftMonth(currentMonth, delta); render(); }
@@ -672,7 +673,7 @@ function renderTx(){
   return `
   <h2 class="pagehead">Mouvements</h2>
   <div class="panel"><h3 class="blocktitle">Historique · ${list.length}</h3>
-    ${list.map(t=>`<div class="list-item"><div><div class="item-main">${t.category} · ${accName(t.accountId)}${(t.sourceRecId||t.sourceCardStatement)?' <span class="tag">auto</span>':''}</div><div class="item-sub">${t.date}${t.note?' — '+t.note:''}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num ${t.type==='in'?'pos':'neg'}">${t.type==='in'?'+':'-'}${fmt(t.amount)}</span><button class="btn danger" onclick="delTx(${t.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun mouvement. Utilise le bouton + en bas.</div>'}
+    ${list.map(t=>`<div class="rec-card" style="margin-bottom:8px;padding:12px;"><div class="rec-icon" style="width:36px;height:36px;font-size:16px;">${categoryIcon(t.category)}</div><div class="rec-body"><div class="rec-title" style="font-size:14px;">${t.category}</div><div class="rec-sub">${t.note?t.note.replace(/ \((RIB|Carte)\)$/,'')+' · ':''}${t.date}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num ${t.type==='in'?'pos':'neg'}" style="font-size:14.5px;">${t.type==='in'?'+':'-'}${fmt(t.amount)}</span><button class="btn danger" style="width:auto;padding:6px 9px;" onclick="delTx(${t.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun mouvement. Utilise le bouton + en bas.</div>'}
   </div>
   <div class="panel"><h3 class="blocktitle">Comptes</h3>
     ${DATA.accounts.map(a=>`<div class="list-item"><div class="item-main">${a.name}</div><div class="num">${fmt(computeBalance(a.id))}</div></div>`).join('')}
@@ -784,13 +785,16 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v29 (carte : total des cochées affiché en bas)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v33 (Client ID Google Drive configuré)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
     <button class="btn primary" onclick="exportJSON()">Sauvegarde complète (JSON)</button>
     <div style="height:8px;"></div>
     <button class="btn ghost" onclick="exportCSV()">Mouvements (CSV)</button>
+    <div style="height:8px;"></div>
+    <button class="btn ghost" onclick="backupToDrive()">📤 Sauvegarder sur Google Drive</button>
+    <div id="driveMsg" class="small" style="margin-top:8px;"></div>
   </div>
   <div class="panel"><h3 class="blocktitle">Importer</h3>
     <div class="small" style="margin-bottom:10px;">Sauvegarde JSON de cette appli, ou export CSV Money Control / Money Manager.</div>
@@ -1035,6 +1039,52 @@ function overrideRecurringMonth(id){
   render();
 }
 function setPrevisMonths(){ window.__previsMonths=document.getElementById('previsMonths').value; render(); }
+// ===== SAUVEGARDE MANUELLE GOOGLE DRIVE =====
+// Remplace par ton propre Client ID (console.google.com > APIs & Services > Identifiants > ID client OAuth > Application Web)
+const GOOGLE_DRIVE_CLIENT_ID = "964719076221-em8ds3m44vbi195bpp95khneeto7ljj5.apps.googleusercontent.com";
+let driveTokenClient = null;
+function backupToDrive(){
+  const msg = document.getElementById('driveMsg');
+  if(GOOGLE_DRIVE_CLIENT_ID.includes("REMPLACE_MOI")){
+    msg.textContent = "Configuration Google Drive manquante (Client ID à renseigner).";
+    return;
+  }
+  msg.textContent = "Connexion à Google...";
+  if(!driveTokenClient){
+    driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_DRIVE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (resp)=>{
+        if(resp.error){ msg.textContent = "Erreur : "+resp.error; return; }
+        uploadJSONToDrive(resp.access_token, msg);
+      }
+    });
+  }
+  driveTokenClient.requestAccessToken();
+}
+async function uploadJSONToDrive(accessToken, msg){
+  try{
+    msg.textContent = "Envoi vers Drive...";
+    const today = todayStr();
+    const fileName = "moneymika-sauvegarde-"+today+".json";
+    const content = JSON.stringify(DATA, null, 2);
+    const boundary = "moneymika_boundary";
+    const metadata = { name: fileName, mimeType: "application/json" };
+    const body =
+      "--"+boundary+"\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n"+JSON.stringify(metadata)+"\r\n"+
+      "--"+boundary+"\r\nContent-Type: application/json\r\n\r\n"+content+"\r\n"+
+      "--"+boundary+"--";
+    const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+      method: "POST",
+      headers: { Authorization: "Bearer "+accessToken, "Content-Type": "multipart/related; boundary="+boundary },
+      body
+    });
+    if(!res.ok) throw new Error("Échec envoi ("+res.status+")");
+    msg.textContent = "✓ Sauvegardé sur Drive : "+fileName;
+  }catch(e){
+    msg.textContent = "Erreur : "+e.message;
+  }
+}
 function exportJSON(){
   let blob=new Blob([JSON.stringify(DATA,null,2)],{type:"application/json"});
   let a=document.createElement('a'); a.href=URL.createObjectURL(blob);
