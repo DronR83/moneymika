@@ -151,9 +151,15 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
     <div class="row"><input id="loginEmail" type="email" placeholder="Email" autocomplete="username"></div>
     <div class="row"><input id="loginPassword" type="password" placeholder="Mot de passe (6 car. min)" autocomplete="current-password"></div>
     <button class="btn primary" id="loginBtn" onclick="doLogin()">Se connecter</button>
-    
+    <div id="bioBtnWrap" style="margin-top:10px;"></div>
   </div>
   <div id="lockSpinner">Connexion…</div>
+  <script>
+    if(localStorage.getItem('moneymika_bio_enabled')==='1'){
+      document.getElementById('bioBtnWrap').innerHTML =
+        '<button class="btn ghost" onclick="unlockWithBiometric()">🔐 Face ID / Empreinte</button>';
+    }
+  </script>
 </div>
 
 <div id="shell">
@@ -301,11 +307,66 @@ async function doLogin(){
     }
     saveLocal();
     unlock();
+    if(window.PublicKeyCredential && localStorage.getItem('moneymika_bio_enabled')!=='1'){
+      setTimeout(()=>{
+        if(confirm("Activer Face ID / empreinte pour te connecter plus vite la prochaine fois ?")){
+          setupBiometric(email, password);
+        }
+      }, 500);
+    }
   }catch(err){
     document.getElementById('lockForm').style.display='block';
     spinner.style.display='none';
     msg.textContent = "Erreur : " + (err.message || "connexion impossible.");
   }
+}
+
+async function setupBiometric(email, password){
+  try{
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const userId = crypto.getRandomValues(new Uint8Array(16));
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { name: "Money Mika" },
+        user: { id: userId, name: email, displayName: email },
+        pubKeyCredParams: [{type:"public-key", alg:-7},{type:"public-key", alg:-257}],
+        authenticatorSelection: { residentKey:"required", userVerification:"required", authenticatorAttachment:"platform" },
+        timeout: 60000
+      }
+    });
+    if(cred){
+      localStorage.setItem('moneymika_bio_email', email);
+      localStorage.setItem('moneymika_bio_pw', btoa(unescape(encodeURIComponent(password))));
+      localStorage.setItem('moneymika_bio_enabled','1');
+      alert("Face ID / empreinte activé.");
+    }
+  }catch(e){
+    alert("Échec activation : "+e.message);
+  }
+}
+async function unlockWithBiometric(){
+  const msg = document.getElementById('lockMsg');
+  msg.textContent = "";
+  try{
+    await navigator.credentials.get({
+      publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), userVerification:"required", timeout:60000 }
+    });
+    const email = localStorage.getItem('moneymika_bio_email');
+    const pwB64 = localStorage.getItem('moneymika_bio_pw');
+    if(!email||!pwB64){ msg.textContent="Aucune configuration biométrique sur cet appareil."; return; }
+    document.getElementById('loginEmail').value = email;
+    document.getElementById('loginPassword').value = decodeURIComponent(escape(atob(pwB64)));
+    await doLogin();
+  }catch(e){
+    msg.textContent = "Face ID / empreinte annulé.";
+  }
+}
+function disableBiometric(){
+  localStorage.removeItem('moneymika_bio_enabled');
+  localStorage.removeItem('moneymika_bio_email');
+  localStorage.removeItem('moneymika_bio_pw');
+  alert("Face ID / empreinte désactivé sur cet appareil.");
 }
 
 async function cloudSaveNow(){
@@ -511,6 +572,24 @@ function render(){
   if(VIEW==='io') c.innerHTML=renderIO();
   attachDrop();
 }
+(function setupSwipeMonth(){
+  let startX=0, startY=0, tracking=false;
+  document.addEventListener('touchstart', e=>{
+    if(VIEW!=='dash') return;
+    tracking=true;
+    startX=e.touches[0].clientX; startY=e.touches[0].clientY;
+  }, {passive:true});
+  document.addEventListener('touchend', e=>{
+    if(!tracking) return;
+    tracking=false;
+    if(VIEW!=='dash') return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if(Math.abs(dx)>70 && Math.abs(dy)<60){
+      changeMonth(dx<0 ? 1 : -1);
+    }
+  }, {passive:true});
+})();
 function balanceBeforeMonth(mk){
   let bal = DATA.accounts.reduce((s,a)=>s+(a.balance||0),0);
   let firstDay = mk+'-01';
@@ -798,8 +877,9 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v39 (bouton restaurer dernière sauvegarde Drive)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v40 (swipe mois + Face ID/empreinte)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
+    ${localStorage.getItem('moneymika_bio_enabled')==='1' ? '<div style="height:8px;"></div><button class="btn ghost" onclick="disableBiometric()">Désactiver Face ID / empreinte</button>' : ''}
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
     <button class="btn primary" onclick="exportJSON()">Sauvegarde complète (JSON)</button>
