@@ -120,12 +120,14 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
 .seg button.active.in{background:rgba(61,220,132,.15);color:var(--green);}
 .list-item{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line-soft);border-radius:10px;transition:background .15s ease;margin:0 -4px;}
 
-.rec-card{display:flex;gap:12px;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px;}
-.rec-icon{width:42px;height:42px;border-radius:50%;background:var(--line-soft);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+.rec-card{display:flex;gap:14px;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:11px;}
+.rec-icon{width:52px;height:52px;border-radius:50%;background:var(--line-soft);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.rec-icon.out{background:linear-gradient(160deg,#c0524a,#8f342d);}
+.rec-icon.in{background:linear-gradient(160deg,#2f8f6f,#1f6650);}
 .rec-body{flex:1;min-width:0;}
-.rec-title{font-size:16.5px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-.rec-sub{font-size:13.5px;color:var(--sub);margin-top:2px;}
-.rec-dates{font-size:12.5px;color:var(--sub);margin-top:5px;display:flex;align-items:center;gap:5px;opacity:.85;}
+.rec-title{font-size:18px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.rec-sub{font-size:14.5px;color:var(--sub);margin-top:3px;}
+.rec-dates{font-size:13px;color:var(--sub);margin-top:6px;display:flex;align-items:center;gap:5px;opacity:.85;}
 .rec-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;}
 .rec-actions{display:flex;gap:6px;}
 .rec-actions button{width:30px;height:30px;border-radius:9px;background:var(--panel);border:1px solid var(--line);color:var(--sub);font-size:13px;box-shadow:none;padding:0;}
@@ -669,7 +671,7 @@ function renderDash(){
   </div>
   <div class="panel"><h3 class="blocktitle">Mouvements du mois</h3>
     <div class="num neg" style="font-size:19px;margin-bottom:12px;">-${fmt(mvtSum)} au total</div>
-    ${recent.map(t=>`<div class="rec-card" style="margin-bottom:8px;padding:12px;"><div class="rec-icon" style="width:36px;height:36px;font-size:16px;">${categoryIcon(t.category)}</div><div class="rec-body"><div class="rec-title" style="font-size:14px;">${t.category}</div><div class="rec-sub">${t.note?t.note.replace(/ \((RIB|Carte)\)$/,'')+' · ':''}${t.date}</div></div><div class="num neg" style="font-size:14.5px;padding-top:2px;">-${fmt(t.amount)}</div></div>`).join('') || '<div class="small">Rien ce mois-ci.</div>'}
+    ${recent.map(t=>`<div class="rec-card" style="margin-bottom:8px;padding:12px;"><div class="rec-icon out" style="width:44px;height:44px;font-size:20px;">${categoryIcon(t.category)}</div><div class="rec-body"><div class="rec-title" style="font-size:15.5px;">${t.category}</div><div class="rec-sub">${t.note?t.note.replace(/ \((RIB|Carte)\)$/,'')+' · ':''}${t.date}</div></div><div class="num neg" style="font-size:15.5px;padding-top:2px;">-${fmt(t.amount)}</div></div>`).join('') || '<div class="small">Rien ce mois-ci.</div>'}
   </div>`;
 }
 function changeMonth(delta){ currentMonth = shiftMonth(currentMonth, delta); render(); }
@@ -794,7 +796,7 @@ function renderTx(){
   return `
   <h2 class="pagehead">Mouvements</h2>
   <div class="panel"><h3 class="blocktitle">Historique · ${list.length}</h3>
-    ${list.map(t=>`<div class="rec-card" style="margin-bottom:8px;padding:12px;"><div class="rec-icon" style="width:36px;height:36px;font-size:16px;">${categoryIcon(t.category)}</div><div class="rec-body"><div class="rec-title" style="font-size:14px;">${t.category}</div><div class="rec-sub">${t.note?t.note.replace(/ \((RIB|Carte)\)$/,'')+' · ':''}${t.date}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num ${t.type==='in'?'pos':'neg'}" style="font-size:14.5px;">${t.type==='in'?'+':'-'}${fmt(t.amount)}</span><button class="btn danger" style="width:auto;padding:6px 9px;" onclick="delTx(${t.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun mouvement. Utilise le bouton + en bas.</div>'}
+    ${list.map(t=>`<div class="rec-card" style="margin-bottom:8px;padding:12px;"><div class="rec-icon ${t.type==='in'?'in':'out'}" style="width:44px;height:44px;font-size:20px;">${categoryIcon(t.category)}</div><div class="rec-body"><div class="rec-title" style="font-size:15.5px;">${t.category}</div><div class="rec-sub">${t.note?t.note.replace(/ \((RIB|Carte)\)$/,'')+' · ':''}${t.date}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num ${t.type==='in'?'pos':'neg'}" style="font-size:15.5px;">${t.type==='in'?'+':'-'}${fmt(t.amount)}</span><button class="btn danger" style="width:auto;padding:6px 9px;" onclick="delTx(${t.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun mouvement. Utilise le bouton + en bas.</div>'}
   </div>
   <div class="panel"><h3 class="blocktitle">Comptes</h3>
     ${DATA.accounts.map(a=>`<div class="list-item"><div class="item-main">${a.name}</div><div class="num">${fmt(computeBalance(a.id))}</div></div>`).join('')}
@@ -824,7 +826,7 @@ function renderRec(){
     let overridden = DATA.recurringOverrides[currentMonth] && DATA.recurringOverrides[currentMonth][r.id]!==undefined;
     let tag = r.type==='out' ? (r.paymentMethod==='carte' ? '💳 Carte · à valider' : '🏦 RIB · auto') : '💼 Auto';
     return `<div class="rec-card">
-      <div class="rec-icon">${categoryIcon(r.category)}</div>
+      <div class="rec-icon ${positive?'in':'out'}">${r.icon || categoryIcon(r.category)}</div>
       <div class="rec-body">
         <div class="rec-title">${r.label}${overridden?' <span class="tag">modifié ce mois</span>':''}</div>
         <div class="rec-sub">${r.category} · ${accName(r.accountId)} · ${tag}</div>
@@ -840,6 +842,7 @@ function renderRec(){
       </div>
     </div>`;
   }
+  const ICON_CHOICES = ['💼','🏠','🛒','🚗','🎮','⚕️','🏦','☁️','📺','💳','📱','⚡','☂️','🏛️','🔌','🛍️','🎓','✈️','🎁','🐾','🍔','📦','💰','🎵','🅿️','💡'];
   return `
   <h2 class="pagehead">Récurrent</h2>
   <div class="cards"><div class="card"><div class="lbl">Revenus fixes / mois</div><div class="val num pos">+${fmt(sumIn)}</div></div><div class="card"><div class="lbl">Dépenses fixes / mois</div><div class="val num neg">-${fmt(sumOut)}</div></div></div>
@@ -847,6 +850,10 @@ function renderRec(){
     <div class="row"><input id="recLabel" placeholder="Ex : Loyer, Salaire, Netflix"><select id="recType" onchange="toggleRecPaymentRow()"><option value="out">Sortie</option><option value="in">Entrée</option></select></div>
     <div class="row"><select id="recAcc">${accOpts}</select><select id="recCat">${catOpts}</select></div>
     <div class="row"><input id="recAmount" type="number" inputmode="decimal" step="0.01" placeholder="Montant"><input id="recDay" type="number" inputmode="numeric" min="1" max="28" placeholder="Jour (ex 5)"></div>
+    <div class="small" style="margin-bottom:6px;">Icône (optionnel)</div>
+    <div id="recIconPicker" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+      ${ICON_CHOICES.map(ic=>`<button type="button" class="icon-choice" data-ic="${ic}" onclick="setRecIcon('${ic}')" style="width:40px;height:40px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);font-size:18px;">${ic}</button>`).join('')}
+    </div>
     <div class="row" id="recPaymentRow">
       <div style="flex:1;">
         <div class="small" style="margin-bottom:4px;">Mode de prélèvement</div>
@@ -880,6 +887,14 @@ function setRecPayment(m){
   document.getElementById('segRib').classList.toggle('active', m==='rib');
   document.getElementById('segCarte').classList.toggle('active', m==='carte');
 }
+function setRecIcon(ic){
+  window.__recIcon = ic;
+  document.querySelectorAll('.icon-choice').forEach(b=>{
+    let on = b.dataset.ic===ic;
+    b.style.background = on ? 'var(--brass)' : 'var(--panel2)';
+    b.style.borderColor = on ? 'var(--brass)' : 'var(--line)';
+  });
+}
 function toggleRecPaymentRow(){
   let type = document.getElementById('recType').value;
   document.getElementById('recPaymentRow').style.display = type==='out' ? 'flex' : 'none';
@@ -906,7 +921,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v41 (responsive corrigé grand écran + design amélioré + animations)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v42 (icônes personnalisées récurrentes + design pastilles colorées type Money Control)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
     ${localStorage.getItem('moneymika_bio_enabled')==='1' ? '<div style="height:8px;"></div><button class="btn ghost" onclick="disableBiometric()">Désactiver Face ID / empreinte</button>' : ''}
   </div>
@@ -1102,6 +1117,7 @@ function editRec(id){
   document.getElementById('recStart').value = r.startDate || '';
   document.getElementById('recEnd').value = r.endDate || '';
   setRecPayment(r.paymentMethod || 'rib');
+  setRecIcon(r.icon || '');
   toggleRecPaymentRow();
   document.getElementById('recFormTitle').textContent = 'Modifier "'+r.label+'"';
   document.getElementById('recSubmitBtn').textContent = 'Enregistrer les modifications';
@@ -1123,18 +1139,20 @@ function addRec(){
   let startDate=document.getElementById('recStart').value || null;
   let endDate=document.getElementById('recEnd').value || null;
   let paymentMethod = type==='out' ? (window.__recPayment||'rib') : null;
+  let icon = window.__recIcon || null;
   if(!label||!amount) return alert("Nom et montant requis.");
   if(editingRecId){
     let r = DATA.recurring.find(x=>x.id===editingRecId);
-    if(r){ Object.assign(r,{label,type,accountId,category,amount,dayOfMonth,startDate,endDate,paymentMethod}); }
+    if(r){ Object.assign(r,{label,type,accountId,category,amount,dayOfMonth,startDate,endDate,paymentMethod,icon}); }
     editingRecId = null;
   } else {
-    DATA.recurring.push({id:DATA.nextRecId++,label,type,accountId,category,amount,dayOfMonth,startDate,endDate,paymentMethod});
+    DATA.recurring.push({id:DATA.nextRecId++,label,type,accountId,category,amount,dayOfMonth,startDate,endDate,paymentMethod,icon});
   }
   save();
   ensureRecurringMaterialized(currentMonth);
   render();
   window.__recPayment='rib';
+  window.__recIcon=null;
 }
 function delRec(id){
   let r = DATA.recurring.find(x=>x.id===id);
