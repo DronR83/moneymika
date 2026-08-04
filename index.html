@@ -121,9 +121,9 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
 .list-item{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line-soft);border-radius:10px;transition:background .15s ease;margin:0 -4px;}
 
 .rec-card{display:flex;gap:14px;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:11px;}
-.rec-icon{width:52px;height:52px;border-radius:50%;background:var(--line-soft);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
-.rec-icon.out{background:linear-gradient(160deg,#c0524a,#8f342d);}
-.rec-icon.in{background:linear-gradient(160deg,#2f8f6f,#1f6650);}
+.rec-icon{width:52px;height:52px;border-radius:50%;background:transparent;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;}
+.rec-icon.out{background:transparent;}
+.rec-icon.in{background:transparent;}
 .rec-body{flex:1;min-width:0;}
 .rec-title{font-size:18px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .rec-sub{font-size:14.5px;color:var(--sub);margin-top:3px;}
@@ -931,7 +931,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v43 (icônes depuis lien web + gestion icônes par catégorie dans Réglages)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v44 (fond icônes transparent)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
     ${localStorage.getItem('moneymika_bio_enabled')==='1' ? '<div style="height:8px;"></div><button class="btn ghost" onclick="disableBiometric()">Désactiver Face ID / empreinte</button>' : ''}
   </div>
