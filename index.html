@@ -58,9 +58,11 @@ body{background-image:radial-gradient(ellipse 900px 500px at 50% -10%, rgba(201,
 }
 .rec-icon{animation:iconPop .35s cubic-bezier(.34,1.56,.64,1) both;}
 @keyframes iconPop{from{transform:scale(.5);opacity:0;}to{transform:scale(1);opacity:1;}}
-/* Grands écrans presque carrés (ex : téléphone pliable ouvert) */
+/* Grands écrans presque carrés (ex : téléphone pliable ouvert) — plein écran, pas de cadre flottant */
 @media (min-width:820px) and (max-aspect-ratio:6/5){
-  #app{max-width:640px;}
+  #shell{padding:0;gap:0;}
+  #brandSide{display:none!important;}
+  #app{max-width:100vw;width:100vw;height:100vh;height:100dvh;border-radius:0;border:none;box-shadow:none;}
   .cards{grid-template-columns:1fr 1fr 1fr 1fr;}
 }
 @media (max-width:360px){
@@ -673,7 +675,7 @@ function renderDash(){
   </div>
   <div class="panel"><h3 class="blocktitle">Mouvements du mois</h3>
     <div class="num neg" style="font-size:19px;margin-bottom:12px;">-${fmt(mvtSum)} au total</div>
-    ${recent.map(t=>`<div class="rec-card" style="margin-bottom:8px;padding:12px;"><div class="rec-icon out" style="width:44px;height:44px;font-size:20px;">${iconHTML(categoryIcon(t.category))}</div><div class="rec-body"><div class="rec-title" style="font-size:15.5px;">${t.category}</div><div class="rec-sub">${t.note?t.note.replace(/ \((RIB|Carte)\)$/,'')+' · ':''}${t.date}</div></div><div class="num neg" style="font-size:15.5px;padding-top:2px;">-${fmt(t.amount)}</div></div>`).join('') || '<div class="small">Rien ce mois-ci.</div>'}
+    ${recent.map(t=>`<div class="rec-card" style="margin-bottom:8px;padding:12px;"><div class="rec-icon out" style="width:44px;height:44px;font-size:20px;">${iconHTML(categoryIcon(t.category))}</div><div class="rec-body"><div class="rec-title" style="font-size:15.5px;">${escapeHtml(t.category)}</div><div class="rec-sub">${t.note?escapeHtml(t.note.replace(/ \((RIB|Carte)\)$/,''))+' · ':''}${t.date}</div></div><div class="num neg" style="font-size:15.5px;padding-top:2px;">-${fmt(t.amount)}</div></div>`).join('') || '<div class="small">Rien ce mois-ci.</div>'}
   </div>`;
 }
 function changeMonth(delta){ currentMonth = shiftMonth(currentMonth, delta); render(); }
@@ -732,7 +734,7 @@ function openDetailModal(type){
       ${catRows.map(([cat,amt])=>`<div class="list-item"><div class="item-main">${cat}</div><div class="num ${type==='in'?'pos':'neg'}">${fmt(amt)}</div></div>`).join('') || '<div class="small">Rien.</div>'}
     </div>
     <h3 class="blocktitle">Détail des mouvements</h3>
-    ${list.map(t=>`<div class="list-item"><div><div class="item-main">${t.category} · ${accName(t.accountId)}</div><div class="item-sub">${t.date}${t.note?' — '+t.note:''}</div></div>
+    ${list.map(t=>`<div class="list-item"><div><div class="item-main">${escapeHtml(t.category)} · ${accName(t.accountId)}</div><div class="item-sub">${t.date}${t.note?' — '+t.note:''}</div></div>
       <div style="display:flex;align-items:center;gap:8px;"><span class="num ${type==='in'?'pos':'neg'}">${fmt(t.amount)}</span>
       <button class="btn danger" onclick="delTx(${t.id}); openDetailModal('${type}');">✕</button></div></div>`).join('') || '<div class="small">Aucun mouvement.</div>'}
     <button class="btn primary" style="margin-top:16px;" onclick="closeDetailModal()">Fermer</button>`;
@@ -798,13 +800,17 @@ function renderTx(){
   return `
   <h2 class="pagehead">Mouvements</h2>
   <div class="panel"><h3 class="blocktitle">Historique · ${list.length}</h3>
-    ${list.map(t=>`<div class="rec-card" style="margin-bottom:8px;padding:12px;"><div class="rec-icon ${t.type==='in'?'in':'out'}" style="width:44px;height:44px;font-size:20px;">${iconHTML(categoryIcon(t.category))}</div><div class="rec-body"><div class="rec-title" style="font-size:15.5px;">${t.category}</div><div class="rec-sub">${t.note?t.note.replace(/ \((RIB|Carte)\)$/,'')+' · ':''}${t.date}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num ${t.type==='in'?'pos':'neg'}" style="font-size:15.5px;">${t.type==='in'?'+':'-'}${fmt(t.amount)}</span><button class="btn danger" style="width:auto;padding:6px 9px;" onclick="delTx(${t.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun mouvement. Utilise le bouton + en bas.</div>'}
+    ${list.map(t=>`<div class="rec-card" style="margin-bottom:8px;padding:12px;"><div class="rec-icon ${t.type==='in'?'in':'out'}" style="width:44px;height:44px;font-size:20px;">${iconHTML(categoryIcon(t.category))}</div><div class="rec-body"><div class="rec-title" style="font-size:15.5px;">${escapeHtml(t.category)}</div><div class="rec-sub">${t.note?escapeHtml(t.note.replace(/ \((RIB|Carte)\)$/,''))+' · ':''}${t.date}</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="num ${t.type==='in'?'pos':'neg'}" style="font-size:15.5px;">${t.type==='in'?'+':'-'}${fmt(t.amount)}</span><button class="btn ghost" style="width:auto;padding:6px 9px;" onclick="editTx(${t.id})">✎</button><button class="btn danger" style="width:auto;padding:6px 9px;" onclick="delTx(${t.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun mouvement. Utilise le bouton + en bas.</div>'}
   </div>
   <div class="panel"><h3 class="blocktitle">Comptes</h3>
-    ${DATA.accounts.map(a=>`<div class="list-item"><div class="item-main">${a.name}</div><div class="num">${fmt(computeBalance(a.id))}</div></div>`).join('')}
+    ${DATA.accounts.map(a=>`<div class="list-item"><div class="item-main">${escapeHtml(a.name)}</div><div class="num">${fmt(computeBalance(a.id))}</div></div>`).join('')}
     <div class="row" style="margin-top:10px;"><input id="accName" placeholder="Nouveau compte"><input id="accBal" type="number" inputmode="decimal" placeholder="Solde initial" value="0"></div>
     <button class="btn ghost" onclick="addAccount()">Ajouter un compte</button>
   </div>`;
+}
+function escapeHtml(s){
+  if(s===undefined||s===null) return '';
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function categoryIcon(cat){
   if(DATA.categoryIcons && DATA.categoryIcons[cat]) return DATA.categoryIcons[cat];
@@ -823,8 +829,8 @@ function iconHTML(val){
   return val;
 }
 function renderRec(){
-  let accOpts=DATA.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
-  let catOpts=DATA.categories.map(c=>`<option value="${c}">${c}</option>`).join('');
+  let accOpts=DATA.accounts.map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  let catOpts=DATA.categories.map(c=>`<option value="${c}">${escapeHtml(c)}</option>`).join('');
   let inList=DATA.recurring.filter(r=>r.type==='in');
   let outList=DATA.recurring.filter(r=>r.type==='out');
   let sumIn=inList.reduce((s,r)=>s+recurringEffectiveAmount(r,currentMonth),0);
@@ -836,8 +842,8 @@ function renderRec(){
     return `<div class="rec-card">
       <div class="rec-icon ${positive?'in':'out'}">${iconHTML(r.icon || categoryIcon(r.category))}</div>
       <div class="rec-body">
-        <div class="rec-title">${r.label}${overridden?' <span class="tag">modifié ce mois</span>':''}</div>
-        <div class="rec-sub">${r.category} · ${accName(r.accountId)} · ${tag}</div>
+        <div class="rec-title">${escapeHtml(r.label)}${overridden?' <span class="tag">modifié ce mois</span>':''}</div>
+        <div class="rec-sub">${escapeHtml(r.category)} · ${accName(r.accountId)} · ${tag}</div>
         <div class="rec-dates">📅 Du ${r.startDate||'origine'} au ${r.endDate||'—'} · le ${r.dayOfMonth}</div>
       </div>
       <div class="rec-right">
@@ -931,7 +937,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v44 (fond icônes transparent)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v45 (sécurité anti-injection + Fold8 plein écran + modif directe mouvement)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
     ${localStorage.getItem('moneymika_bio_enabled')==='1' ? '<div style="height:8px;"></div><button class="btn ghost" onclick="disableBiometric()">Désactiver Face ID / empreinte</button>' : ''}
   </div>
@@ -964,7 +970,7 @@ function renderIO(){
     ${DATA.categories.map(c=>`<div class="list-item">
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="rec-icon out" style="width:38px;height:38px;font-size:17px;cursor:pointer;" onclick="changeCategoryIcon('${c.replace(/'/g,"\\'")}')">${iconHTML(categoryIcon(c))}</div>
-        <div class="item-main" style="cursor:pointer;" onclick="renameCategory('${c.replace(/'/g,"\\'")}')">${c}</div>
+        <div class="item-main" style="cursor:pointer;" onclick="renameCategory('${c.replace(/'/g,"\\'")}')">${escapeHtml(c)}</div>
       </div>
       <button class="btn danger" onclick="deleteCategory('${c.replace(/'/g,"\\'")}')">✕</button>
     </div>`).join('')}
@@ -993,8 +999,8 @@ function doLogout(){
 let quickType='out';
 function openQuick(){
   document.getElementById('qDate').value = todayStr();
-  document.getElementById('qAcc').innerHTML = DATA.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
-  document.getElementById('qCat').innerHTML = DATA.categories.map(c=>`<option value="${c}">${c}</option>`).join('');
+  document.getElementById('qAcc').innerHTML = DATA.accounts.map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  document.getElementById('qCat').innerHTML = DATA.categories.map(c=>`<option value="${c}">${escapeHtml(c)}</option>`).join('');
   setQuickType('out');
   document.getElementById('quickOverlay').classList.add('open');
 }
@@ -1053,12 +1059,12 @@ function renderCardSheet(){
     <div class="small" style="margin-bottom:8px;">Non cochée : compte comme une sortie normale. Cochée : sort de la liste et rejoint le relevé ci-dessus.</div>
     ${carteList.map(r=>{
       let on = validated.includes(r.id);
-      return `<div class="list-item" style="cursor:pointer;" onclick="toggleDefer(${r.id})"><div><div class="item-main">${r.label}</div><div class="item-sub">${r.category} · -${fmt(r.amount)}</div></div><div class="check ${on?'on':''}"></div></div>`;
+      return `<div class="list-item" style="cursor:pointer;" onclick="toggleDefer(${r.id})"><div><div class="item-main">${escapeHtml(r.label)}</div><div class="item-sub">${escapeHtml(r.category)} · -${fmt(r.amount)}</div></div><div class="check ${on?'on':''}"></div></div>`;
     }).join('') || '<div class="small">Aucune dépense taguée "Carte".</div>'}
     <div class="num neg" style="font-size:14px;margin-top:8px;">Déjà comptabilisé (cochées) : -${fmt(carteList.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+r.amount,0))}</div>
 
     <h3 class="blocktitle" style="margin-top:16px;">Achats ponctuels du mois</h3>
-    ${extras.map(e=>`<div class="list-item"><div class="item-main">${e.label}</div><div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(e.amount)}</span><button class="btn danger" onclick="delCardExtra(${e.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun.</div>'}
+    ${extras.map(e=>`<div class="list-item"><div class="item-main">${escapeHtml(e.label)}</div><div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(e.amount)}</span><button class="btn danger" onclick="delCardExtra(${e.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun.</div>'}
     <div class="row" style="margin-top:10px;">
       <input id="extraLabel" placeholder="Ex : Resto, Essence...">
       <input id="extraAmount" type="number" inputmode="decimal" step="0.01" placeholder="Montant">
@@ -1119,6 +1125,16 @@ function addAccount(){
   DATA.accounts.push({id:DATA.nextAccId++,name,balance:bal}); save(); render();
 }
 function delTx(id){ DATA.transactions=DATA.transactions.filter(t=>t.id!==id); save(); render(); }
+function editTx(id){
+  let t = DATA.transactions.find(x=>x.id===id);
+  if(!t) return;
+  let val = prompt('Nouveau montant pour "'+(t.category||'')+'" du '+t.date+' (ce mouvement seulement) :', t.amount);
+  if(val===null) return;
+  let amount = parseFloat(String(val).replace(',','.'));
+  if(isNaN(amount)||amount<=0) return alert("Montant invalide.");
+  t.amount = amount;
+  save(); render();
+}
 let editingRecId = null;
 function editRec(id){
   let r = DATA.recurring.find(x=>x.id===id);
