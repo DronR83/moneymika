@@ -1,1 +1,8 @@
-
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.vercel.moneymika.twa",
+    "sha256_cert_fingerprints": ["04:56:E2:45:4C:52:53:5F:CF:CE:50:E4:F3:FE:D5:57:2F:63:26:EB:78:8B:D9:AE:5A:0F:FC:9E:34:93:AC:2B"]
+  }
+}]
