@@ -242,6 +242,15 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
     <div class="row"><input type="date" id="qDate"><select id="qAcc"></select></div>
     <div class="row"><select id="qCat"></select><input id="qAmount" type="number" inputmode="decimal" step="0.01" placeholder="Montant €"></div>
     <div class="row"><input id="qNote" placeholder="Note (optionnel)"></div>
+    <div id="qPaymentRow" class="row">
+      <div style="flex:1;">
+        <div class="small" style="margin-bottom:4px;">Mode de paiement</div>
+        <div class="seg" style="margin-bottom:0;">
+          <button type="button" id="qSegRib" class="active" onclick="setQuickPayment('rib')">RIB · direct</button>
+          <button type="button" id="qSegCarte" onclick="setQuickPayment('carte')">Carte · à valider</button>
+        </div>
+      </div>
+    </div>
     <button class="btn primary" onclick="quickAdd()">Ajouter</button>
   </div>
 </div>
@@ -356,6 +365,7 @@ async function doLogin(){
       if(!DATA.cardManualTotal) DATA.cardManualTotal={};
       if(!DATA.recurringOverrides) DATA.recurringOverrides={};
       if(!DATA.categoryIcons) DATA.categoryIcons={};
+      if(!DATA.cardExtraValidated) DATA.cardExtraValidated={};
       if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1;
     } else {
       const {key, salt} = await deriveKey(password);
@@ -479,7 +489,7 @@ const LOCAL_KEY = "moneymika_local_cache";
 let DATA = loadLocal() || {
   accounts:[{id:1,name:"Compte courant",balance:0}],
   categories:["Salaire","Loyer","Courses","Transport","Loisirs","Santé","Autre"],
-  transactions:[], recurring:[], cardDefer:{}, cardExtras:{}, cardManualTotal:{}, recurringOverrides:{}, categoryIcons:{},
+  transactions:[], recurring:[], cardDefer:{}, cardExtras:{}, cardManualTotal:{}, recurringOverrides:{}, categoryIcons:{}, cardExtraValidated:{},
   nextTxId:1, nextAccId:2, nextRecId:1, nextCardExtraId:1
 };
 if(!DATA.cardDefer) DATA.cardDefer={};
@@ -487,6 +497,7 @@ if(!DATA.cardExtras) DATA.cardExtras={};
 if(!DATA.cardManualTotal) DATA.cardManualTotal={};
 if(!DATA.recurringOverrides) DATA.recurringOverrides={};
 if(!DATA.categoryIcons) DATA.categoryIcons={};
+if(!DATA.cardExtraValidated) DATA.cardExtraValidated={};
 if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1;
 function saveLocal(){ localStorage.setItem(LOCAL_KEY, JSON.stringify(DATA)); }
 function loadLocal(){ try{ return JSON.parse(localStorage.getItem(LOCAL_KEY)); }catch(e){ return null; } }
@@ -533,6 +544,9 @@ function cardAutoTotal(mk){
   let validated = DATA.cardDefer[mk] || [];
   let carte = DATA.recurring.filter(r=>r.type==='out' && r.paymentMethod==='carte' && recurringActiveInMonth(r,mk));
   let sum = carte.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+recurringEffectiveAmount(r,mk),0);
+  let extraValidated = DATA.cardExtraValidated[mk] || [];
+  let extras = DATA.cardExtras[mk] || [];
+  sum += extras.filter(e=>extraValidated.includes(e.id)).reduce((s,e)=>s+e.amount,0);
   return sum;
 }
 function cardTotalForMonth(mk){
@@ -581,16 +595,25 @@ function ensureRecurringMaterialized(mk){
       changed = true;
     }
   });
-  // Achats ponctuels carte = mouvements séparés (plus repliés dans le relevé)
+  // Achats ponctuels carte : non validés = mouvement individuel (compte comme une dépense normale),
+  // validés = repliés dans le relevé carte (comme les récurrentes cochées)
+  let extraValidatedSet = DATA.cardExtraValidated[mk] || [];
   let extras = DATA.cardExtras[mk] || [];
   extras.forEach(e=>{
+    let isValidated = extraValidatedSet.includes(e.id);
     let existing = DATA.transactions.find(t=>t.sourceCardExtraId===e.id && t.date.slice(0,7)===mk);
-    let dateVal = mk+'-'+String(new Date(mk+'-01').getDate()||1).padStart(2,'0');
+    if(isValidated){
+      if(existing){ DATA.transactions.splice(DATA.transactions.indexOf(existing),1); changed=true; }
+      return;
+    }
+    let dateVal = mk+'-'+String(e.day||15).padStart(2,'0');
+    let acc = e.accountId || DATA.accounts[0]?.id;
+    let cat = e.category || 'Carte';
     if(!existing){
-      DATA.transactions.push({id:DATA.nextTxId++, date:mk+'-15', accountId:DATA.accounts[0]?.id, type:'out', category:'Carte', amount:e.amount, note:e.label+' (ponctuel)', sourceCardExtraId:e.id});
+      DATA.transactions.push({id:DATA.nextTxId++, date:dateVal, accountId:acc, type:'out', category:cat, amount:e.amount, note:e.label+' (carte, non validé)', sourceCardExtraId:e.id});
       changed = true;
-    } else if(existing.amount!==e.amount){
-      existing.amount = e.amount;
+    } else if(existing.amount!==e.amount || existing.category!==cat || existing.accountId!==acc){
+      existing.amount = e.amount; existing.category = cat; existing.accountId = acc;
       changed = true;
     }
   });
@@ -959,7 +982,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v51 (sécurité renforcée : CSP, verrouillage auto 10 min)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v52 (choix RIB/Carte à l'ajout rapide + validation ponctuels carte)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
     ${localStorage.getItem('moneymika_bio_enabled')==='1' ? '<div style="height:8px;"></div><button class="btn ghost" onclick="disableBiometric()">Désactiver Face ID / empreinte</button>' : ''}
   </div>
@@ -1038,15 +1061,27 @@ function doLogout(){
 
 // ---------- MODALE AJOUT RAPIDE ----------
 let quickType='out';
+let quickPayment='rib';
 function openQuick(){
   document.getElementById('qDate').value = todayStr();
   document.getElementById('qAcc').innerHTML = DATA.accounts.map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
   document.getElementById('qCat').innerHTML = DATA.categories.map(c=>`<option value="${c}">${escapeHtml(c)}</option>`).join('');
   setQuickType('out');
+  setQuickPayment('rib');
   document.getElementById('quickOverlay').classList.add('open');
 }
 function closeQuick(){ document.getElementById('quickOverlay').classList.remove('open'); }
-function setQuickType(t){ quickType=t; document.getElementById('segOut').classList.toggle('active', t==='out'); document.getElementById('segIn').classList.toggle('active', t==='in'); }
+function setQuickType(t){
+  quickType=t;
+  document.getElementById('segOut').classList.toggle('active', t==='out');
+  document.getElementById('segIn').classList.toggle('active', t==='in');
+  document.getElementById('qPaymentRow').style.display = t==='out' ? 'flex' : 'none';
+}
+function setQuickPayment(p){
+  quickPayment=p;
+  document.getElementById('qSegRib').classList.toggle('active', p==='rib');
+  document.getElementById('qSegCarte').classList.toggle('active', p==='carte');
+}
 function quickAdd(){
   let date=document.getElementById('qDate').value || todayStr();
   let accountId=parseInt(document.getElementById('qAcc').value);
@@ -1054,8 +1089,17 @@ function quickAdd(){
   let amount=parseFloat(document.getElementById('qAmount').value);
   let note=document.getElementById('qNote').value;
   if(!amount) return alert("Montant requis.");
-  DATA.transactions.push({id:DATA.nextTxId++,date,accountId,type:quickType,category,amount,note});
-  save();
+  if(quickType==='out' && quickPayment==='carte'){
+    // dépense carte : attend validation dans "Carte du mois", ne compte pas tout de suite
+    let mk = date.slice(0,7);
+    if(!DATA.cardExtras[mk]) DATA.cardExtras[mk]=[];
+    DATA.cardExtras[mk].push({id:DATA.nextCardExtraId++, label:note||category, amount, category, accountId, day:date.slice(8,10)});
+    save();
+    ensureRecurringMaterialized(mk);
+  } else {
+    DATA.transactions.push({id:DATA.nextTxId++,date,accountId,type:quickType,category,amount,note});
+    save();
+  }
   document.getElementById('qAmount').value=''; document.getElementById('qNote').value='';
   closeQuick(); render();
 }
@@ -1075,14 +1119,15 @@ function renderCardSheet(){
   let extras = DATA.cardExtras[cardModalMonth] || [];
   let manual = DATA.cardManualTotal[cardModalMonth];
   let isManual = manual!==undefined && manual!==null && manual!=='';
-  let categorized = carteList.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+r.amount,0) + extras.reduce((s,e)=>s+e.amount,0);
+  let extraValidatedSet = DATA.cardExtraValidated[cardModalMonth] || [];
+  let categorized = carteList.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+r.amount,0) + extras.filter(e=>extraValidatedSet.includes(e.id)).reduce((s,e)=>s+e.amount,0);
   let displayedTotal = isManual ? parseFloat(manual) : categorized;
   document.getElementById('cardSheet').innerHTML = `
     <div class="handle"></div>
     <h3 class="blocktitle">💳 Carte du mois</h3>
     <h2 class="pagehead" style="margin-bottom:2px;">${monthLabel(cardModalMonth)}</h2>
     <div class="num neg" style="font-size:20px;margin-bottom:2px;">-${fmt(displayedTotal)} au total</div>
-    <div class="small" style="margin-bottom:14px;">${isManual ? 'Montant saisi manuellement (relevé bancaire réel).' : 'Calcul automatique (récurrentes cochées + achats ponctuels).'}</div>
+    <div class="small" style="margin-bottom:14px;">${isManual ? 'Montant saisi manuellement (relevé bancaire réel).' : 'Calcul automatique (récurrentes + achats ponctuels validés).'}</div>
     <div class="row" style="margin-bottom:14px;">
       <button class="btn ghost" onclick="openCardModal(shiftMonth(cardModalMonth,-1))">‹ ${monthLabel(shiftMonth(cardModalMonth,-1))}</button>
       <button class="btn ghost" onclick="openCardModal(shiftMonth(cardModalMonth,1))">${monthLabel(shiftMonth(cardModalMonth,1))} ›</button>
@@ -1102,16 +1147,29 @@ function renderCardSheet(){
       let on = validated.includes(r.id);
       return `<div class="list-item" style="cursor:pointer;" onclick="toggleDefer(${r.id})"><div><div class="item-main">${escapeHtml(r.label)}</div><div class="item-sub">${escapeHtml(r.category)} · -${fmt(r.amount)}</div></div><div class="check ${on?'on':''}"></div></div>`;
     }).join('') || '<div class="small">Aucune dépense taguée "Carte".</div>'}
-    <div class="num neg" style="font-size:14px;margin-top:8px;">Déjà comptabilisé (cochées) : -${fmt(carteList.filter(r=>validated.includes(r.id)).reduce((s,r)=>s+r.amount,0))}</div>
 
-    <h3 class="blocktitle" style="margin-top:16px;">Achats ponctuels du mois</h3>
-    ${extras.map(e=>`<div class="list-item"><div class="item-main">${escapeHtml(e.label)}</div><div style="display:flex;align-items:center;gap:8px;"><span class="num neg">-${fmt(e.amount)}</span><button class="btn danger" onclick="delCardExtra(${e.id})">✕</button></div></div>`).join('') || '<div class="small">Aucun.</div>'}
+    <h3 class="blocktitle" style="margin-top:16px;">Achats ponctuels carte</h3>
+    <div class="small" style="margin-bottom:8px;">Non validé : compte comme une sortie normale. Validé : sort de la liste et rejoint le relevé.</div>
+    ${extras.map(e=>{
+      let on = extraValidatedSet.includes(e.id);
+      return `<div class="list-item"><div style="cursor:pointer;flex:1;" onclick="toggleExtraValidated(${e.id})"><div class="item-main">${escapeHtml(e.label)}</div><div class="item-sub">-${fmt(e.amount)}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="check ${on?'on':''}" onclick="toggleExtraValidated(${e.id})"></div><button class="btn danger" onclick="delCardExtra(${e.id})">✕</button></div></div>`;
+    }).join('') || '<div class="small">Aucun. Ajoute-en via le bouton + en choisissant "Carte".</div>'}
     <div class="row" style="margin-top:10px;">
       <input id="extraLabel" placeholder="Ex : Resto, Essence...">
       <input id="extraAmount" type="number" inputmode="decimal" step="0.01" placeholder="Montant">
     </div>
     <button class="btn ghost" onclick="addCardExtra()">Ajouter cet achat</button>
     <button class="btn primary" style="margin-top:16px;" onclick="closeCardModal(); render();">Fermer</button>`;
+}
+function toggleExtraValidated(extraId){
+  if(!DATA.cardExtraValidated[cardModalMonth]) DATA.cardExtraValidated[cardModalMonth]=[];
+  let arr = DATA.cardExtraValidated[cardModalMonth];
+  let idx = arr.indexOf(extraId);
+  if(idx>-1) arr.splice(idx,1); else arr.push(extraId);
+  save();
+  ensureRecurringMaterialized(cardModalMonth);
+  renderCardSheet();
+  render();
 }
 function saveCardManual(){
   let val = document.getElementById('cardManualInput').value;
@@ -1134,7 +1192,7 @@ function addCardExtra(){
   let amount=parseFloat(document.getElementById('extraAmount').value);
   if(!label||!amount) return alert("Nom et montant requis.");
   if(!DATA.cardExtras[cardModalMonth]) DATA.cardExtras[cardModalMonth]=[];
-  DATA.cardExtras[cardModalMonth].push({id:DATA.nextCardExtraId++, label, amount});
+  DATA.cardExtras[cardModalMonth].push({id:DATA.nextCardExtraId++, label, amount, category:'Carte', accountId:DATA.accounts[0]?.id, day:15});
   save();
   ensureRecurringMaterialized(cardModalMonth);
   renderCardSheet();
@@ -1142,6 +1200,7 @@ function addCardExtra(){
 }
 function delCardExtra(id){
   DATA.cardExtras[cardModalMonth] = (DATA.cardExtras[cardModalMonth]||[]).filter(e=>e.id!==id);
+  if(DATA.cardExtraValidated[cardModalMonth]) DATA.cardExtraValidated[cardModalMonth] = DATA.cardExtraValidated[cardModalMonth].filter(eid=>eid!==id);
   save();
   ensureRecurringMaterialized(cardModalMonth);
   renderCardSheet();
@@ -1376,6 +1435,8 @@ async function restoreLatestFromDrive(accessToken, msg){
     if(!DATA.cardExtras) DATA.cardExtras={};
     if(!DATA.cardManualTotal) DATA.cardManualTotal={};
     if(!DATA.recurringOverrides) DATA.recurringOverrides={};
+    if(!DATA.categoryIcons) DATA.categoryIcons={};
+    if(!DATA.cardExtraValidated) DATA.cardExtraValidated={};
     if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1;
     save();
     materializeUpToCurrent();
@@ -1471,7 +1532,7 @@ function importFile(file){
     try{
       if(file.name.endsWith('.json')){
         const obj=JSON.parse(text);
-        if(obj.transactions && obj.accounts){ DATA=obj; if(!DATA.recurring) DATA.recurring=[]; if(!DATA.cardDefer) DATA.cardDefer={}; if(!DATA.cardExtras) DATA.cardExtras={}; if(!DATA.cardManualTotal) DATA.cardManualTotal={}; if(!DATA.recurringOverrides) DATA.recurringOverrides={}; if(!DATA.categoryIcons) DATA.categoryIcons={}; if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1; save(); msg.textContent="Sauvegarde chargée : "+DATA.transactions.length+" mouvements."; }
+        if(obj.transactions && obj.accounts){ DATA=obj; if(!DATA.recurring) DATA.recurring=[]; if(!DATA.cardDefer) DATA.cardDefer={}; if(!DATA.cardExtras) DATA.cardExtras={}; if(!DATA.cardManualTotal) DATA.cardManualTotal={}; if(!DATA.recurringOverrides) DATA.recurringOverrides={}; if(!DATA.categoryIcons) DATA.categoryIcons={}; if(!DATA.cardExtraValidated) DATA.cardExtraValidated={}; if(!DATA.nextCardExtraId) DATA.nextCardExtraId=1; save(); msg.textContent="Sauvegarde chargée : "+DATA.transactions.length+" mouvements."; }
         else msg.textContent="Fichier JSON non reconnu.";
       } else importCSVGeneric(text,msg);
       render();
