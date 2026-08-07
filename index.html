@@ -102,7 +102,7 @@ body{background-image:radial-gradient(ellipse 900px 500px at 50% -10%, rgba(201,
   .rec-icon{width:34px;height:34px;font-size:16px;}
 }
 #content{flex:1;padding:20px 18px 140px;overflow-y:auto;}
-h2.pagehead{font-family:var(--serif);font-size:clamp(27px,6vw,32px);font-weight:400;letter-spacing:.3px;margin:2px 0 18px;color:var(--txt);}
+h2.pagehead{font-family:var(--serif);font-size:clamp(29px,6.5vw,34px);font-weight:400;letter-spacing:.3px;margin:2px 0 18px;color:var(--txt);}
 h3.blocktitle{font-family:var(--sans);font-size:13.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--sub);margin:0 0 14px;}
 .num{font-family:var(--serif);font-variant-numeric:tabular-nums;}
 .month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:6px 6px;}
@@ -115,18 +115,18 @@ h3.blocktitle{font-family:var(--sans);font-size:13.5px;font-weight:600;letter-sp
 .card::before{content:'';position:absolute;top:-40%;right:-30%;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle, rgba(201,163,76,.10), transparent 70%);}
 .card.clickable{cursor:pointer;}
 .card.clickable:active{transform:scale(.96);}
-.card .lbl{font-size:13px;color:var(--sub);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px;}
-.card .val{font-family:var(--serif);font-size:clamp(23px,6.5vw,27px);font-weight:400;}
+.card .lbl{font-size:13.5px;color:var(--sub);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px;}
+.card .val{font-family:var(--serif);font-size:clamp(25px,7vw,29px);font-weight:400;}
 .pos{color:var(--green);} .neg{color:var(--red);}
 .accent{color:var(--brass-light);}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 1px 0 rgba(255,255,255,.02) inset, 0 8px 24px rgba(0,0,0,.18);animation:fadeInUp .4s ease both;}
 @keyframes fadeInUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-input,select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:15px 16px;border-radius:12px;font-size:17px;width:100%;font-family:var(--sans);transition:border-color .15s ease, box-shadow .15s ease;}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:16px 17px;border-radius:12px;font-size:18px;width:100%;font-family:var(--sans);transition:border-color .15s ease, box-shadow .15s ease;}
 input:focus,select:focus{outline:none;border-color:var(--brass);box-shadow:0 0 0 3px rgba(201,163,76,.15);}
 .row{display:flex;gap:8px;margin-bottom:10px;}
 .row > *{flex:1;}
-.small{font-size:14px;color:var(--sub);}
-button.btn{cursor:pointer;font-weight:600;font-size:16.5px;width:100%;border:none;border-radius:14px;padding:15px;color:var(--txt);background:var(--panel2);border:1px solid var(--line);transform:translateY(0);box-shadow:0 3px 0 rgba(0,0,0,.35), 0 8px 16px rgba(0,0,0,.15);transition:transform .08s ease, box-shadow .08s ease, background .15s ease;}
+.small{font-size:15px;color:var(--sub);}
+button.btn{cursor:pointer;font-weight:600;font-size:17.5px;width:100%;border:none;border-radius:14px;padding:16px;color:var(--txt);background:var(--panel2);border:1px solid var(--line);transform:translateY(0);box-shadow:0 3px 0 rgba(0,0,0,.35), 0 8px 16px rgba(0,0,0,.15);transition:transform .08s ease, box-shadow .08s ease, background .15s ease;}
 button.btn:active{transform:translateY(3px);box-shadow:0 0 0 rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.15);}
 button.btn.primary{background:linear-gradient(160deg, var(--brass-light), var(--brass) 55%, var(--brass-dark));color:#1a1305;border:none;box-shadow:0 3px 0 rgba(90,65,10,.6), 0 10px 22px rgba(201,163,76,.25);}
 button.btn.primary:active{box-shadow:0 0 0 rgba(90,65,10,.6), 0 3px 8px rgba(201,163,76,.18);}
@@ -153,8 +153,8 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
 .rec-icon.out{background:transparent;}
 .rec-icon.in{background:transparent;}
 .rec-body{flex:1;min-width:0;}
-.rec-title{font-size:18px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-.rec-sub{font-size:14.5px;color:var(--sub);margin-top:3px;}
+.rec-title{font-size:19px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.rec-sub{font-size:15.5px;color:var(--sub);margin-top:3px;}
 .rec-dates{font-size:13px;color:var(--sub);margin-top:6px;display:flex;align-items:center;gap:5px;opacity:.85;}
 .rec-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;}
 .rec-actions{display:flex;gap:6px;}
@@ -163,8 +163,8 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
 .rec-actions button.danger{color:var(--red);background:rgba(255,107,107,.1);border-color:rgba(255,107,107,.25);}
 .list-item:active{background:rgba(201,163,76,.06);}
 .list-item:last-child{border-bottom:none;}
-.item-main{font-size:17px;font-weight:500;}
-.item-sub{font-size:13.5px;color:var(--sub);margin-top:2px;}
+.item-main{font-size:18px;font-weight:500;}
+.item-sub{font-size:14.5px;color:var(--sub);margin-top:2px;}
 .dot-bar{background:var(--line-soft);border-radius:6px;width:70px;height:6px;overflow:hidden;}
 .dot-fill{height:6px;border-radius:6px;transition:width .3s ease;}
 .check{width:24px;height:24px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s ease;cursor:pointer;}
@@ -985,7 +985,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v55 (icône en vrai fichier image, plus data-uri géante)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v56 (verrouillage immédiat à la fermeture + textes agrandis partout)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
     ${localStorage.getItem('moneymika_bio_enabled')==='1' ? '<div style="height:8px;"></div><button class="btn ghost" onclick="disableBiometric()">Désactiver Face ID / empreinte</button>' : ''}
   </div>
@@ -1044,7 +1044,8 @@ function doLogout(){
   document.getElementById('loginPassword').value="";
 }
 
-// Verrouillage automatique après 10 minutes sans activité
+// Verrouillage automatique : dès que l'appli est fermée/mise en arrière-plan,
+// et aussi après 10 minutes sans activité si elle reste ouverte au premier plan.
 (function autoLock(){
   const DELAY = 10*60*1000;
   let timer = null;
@@ -1058,7 +1059,14 @@ function doLogout(){
   ['touchstart','click','keydown','scroll'].forEach(ev=>{
     document.addEventListener(ev, reset, {passive:true});
   });
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) reset(); });
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden){
+      if(currentUid) doLogout();
+    } else {
+      reset();
+    }
+  });
+  window.addEventListener('pagehide', ()=>{ if(currentUid) doLogout(); });
   setInterval(reset, 60*1000);
 })();
 
