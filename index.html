@@ -408,14 +408,21 @@ async function setupBiometric(email, password){
     const cred = await navigator.credentials.create({
       publicKey: {
         challenge,
-        rp: { name: "Money Mika" },
+        rp: { name: "Money Mika", id: location.hostname },
         user: { id: userId, name: email, displayName: email },
         pubKeyCredParams: [{type:"public-key", alg:-7},{type:"public-key", alg:-257}],
-        authenticatorSelection: { residentKey:"required", userVerification:"required", authenticatorAttachment:"platform" },
+        authenticatorSelection: {
+          residentKey: "discouraged",
+          requireResidentKey: false,
+          userVerification: "required",
+          authenticatorAttachment: "platform"
+        },
         timeout: 60000
       }
     });
     if(cred){
+      const credIdB64 = bufToBase64(cred.rawId);
+      localStorage.setItem('moneymika_bio_credid', credIdB64);
       localStorage.setItem('moneymika_bio_email', email);
       localStorage.setItem('moneymika_bio_pw', btoa(unescape(encodeURIComponent(password))));
       localStorage.setItem('moneymika_bio_enabled','1');
@@ -441,9 +448,23 @@ async function unlockWithBiometric(){
   const msg = document.getElementById('lockMsg');
   msg.textContent = "";
   try{
-    await navigator.credentials.get({
-      publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), userVerification:"required", timeout:60000 }
-    });
+    const credIdB64 = localStorage.getItem('moneymika_bio_credid');
+    const getOpts = {
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rpId: location.hostname,
+        userVerification: "required",
+        timeout: 60000
+      }
+    };
+    if(credIdB64){
+      getOpts.publicKey.allowCredentials = [{
+        type: "public-key",
+        id: base64ToBuf(credIdB64),
+        transports: ["internal"]
+      }];
+    }
+    await navigator.credentials.get(getOpts);
     const email = localStorage.getItem('moneymika_bio_email');
     const pwB64 = localStorage.getItem('moneymika_bio_pw');
     if(!email||!pwB64){ msg.textContent="Aucune configuration biométrique sur cet appareil."; return; }
@@ -458,6 +479,7 @@ function disableBiometric(){
   localStorage.removeItem('moneymika_bio_enabled');
   localStorage.removeItem('moneymika_bio_email');
   localStorage.removeItem('moneymika_bio_pw');
+  localStorage.removeItem('moneymika_bio_credid');
   alert("Face ID / empreinte désactivé sur cet appareil.");
 }
 
@@ -1007,7 +1029,7 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v58 (déverrouillage empreinte auto, un seul tap, mot de passe caché)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v59 (empreinte locale directe, plus de passage par Google Password Manager)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
     ${localStorage.getItem('moneymika_bio_enabled')==='1' ? '<div style="height:8px;"></div><button class="btn ghost" onclick="disableBiometric()">Désactiver Face ID / empreinte</button>' : (window.PublicKeyCredential ? '<div style="height:8px;"></div><button class="btn ghost" onclick="setupBiometricFromSettings()">Activer Face ID / empreinte</button>' : '')}
   </div>
