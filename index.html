@@ -209,8 +209,14 @@ button.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:
   <div id="lockSpinner">Connexion…</div>
   <script>
     if(localStorage.getItem('moneymika_bio_enabled')==='1'){
+      document.getElementById('lockForm').style.display='none';
+      document.getElementById('bioBtnWrap').style.display='block';
       document.getElementById('bioBtnWrap').innerHTML =
-        '<button class="btn ghost" onclick="unlockWithBiometric()">🔐 Face ID / Empreinte</button>';
+        '<button class="btn primary" onclick="unlockWithBiometric()">🔐 Face ID / Empreinte</button>'+
+        '<div style="height:10px;"></div>'+
+        '<button class="btn ghost" onclick="showPasswordFallback()">Utiliser le mot de passe</button>';
+      document.getElementById('lockForm').insertAdjacentElement('afterend', document.getElementById('bioBtnWrap'));
+      setTimeout(()=>{ if(localStorage.getItem('moneymika_bio_enabled')==='1') unlockWithBiometric(); }, 300);
     }
   </script>
 </div>
@@ -392,6 +398,10 @@ async function doLogin(){
 }
 
 async function setupBiometric(email, password){
+  if(!window.PublicKeyCredential){
+    alert("Ton appareil/navigateur ne supporte pas Face ID / empreinte.");
+    return;
+  }
   try{
     const challenge = crypto.getRandomValues(new Uint8Array(32));
     const userId = crypto.getRandomValues(new Uint8Array(16));
@@ -410,10 +420,22 @@ async function setupBiometric(email, password){
       localStorage.setItem('moneymika_bio_pw', btoa(unescape(encodeURIComponent(password))));
       localStorage.setItem('moneymika_bio_enabled','1');
       alert("Face ID / empreinte activé.");
+      render();
     }
   }catch(e){
-    alert("Échec activation : "+e.message);
+    alert("Échec activation : "+(e.message || e.name || "inconnu"));
   }
+}
+function setupBiometricFromSettings(){
+  const pw = prompt("Confirme ton mot de passe pour activer Face ID / empreinte :");
+  if(!pw) return;
+  const email = auth.currentUser ? auth.currentUser.email : '';
+  setupBiometric(email, pw);
+}
+function showPasswordFallback(){
+  document.getElementById('lockForm').style.display='block';
+  const wrap = document.getElementById('bioBtnWrap');
+  if(wrap) wrap.style.display='none';
 }
 async function unlockWithBiometric(){
   const msg = document.getElementById('lockMsg');
@@ -985,9 +1007,9 @@ function renderIO(){
   <h2 class="pagehead">Réglages</h2>
   <div class="panel"><h3 class="blocktitle">Compte & sécurité</h3>
     <div class="small">Connecté : ${auth.currentUser ? auth.currentUser.email : ''}. Données chiffrées avant synchronisation, mot de passe jamais envoyé.</div>
-    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v56 (verrouillage immédiat à la fermeture + textes agrandis partout)</div>
+    <div class="small" style="margin-top:6px;color:var(--brass-light);">Version app : v58 (déverrouillage empreinte auto, un seul tap, mot de passe caché)</div>
     <button class="btn ghost" style="margin-top:12px;" onclick="doLogout()">Se déconnecter</button>
-    ${localStorage.getItem('moneymika_bio_enabled')==='1' ? '<div style="height:8px;"></div><button class="btn ghost" onclick="disableBiometric()">Désactiver Face ID / empreinte</button>' : ''}
+    ${localStorage.getItem('moneymika_bio_enabled')==='1' ? '<div style="height:8px;"></div><button class="btn ghost" onclick="disableBiometric()">Désactiver Face ID / empreinte</button>' : (window.PublicKeyCredential ? '<div style="height:8px;"></div><button class="btn ghost" onclick="setupBiometricFromSettings()">Activer Face ID / empreinte</button>' : '')}
   </div>
   <div class="panel"><h3 class="blocktitle">Exporter</h3>
     <button class="btn primary" onclick="exportJSON()">Sauvegarde complète (JSON)</button>
@@ -1039,9 +1061,23 @@ function doLogout(){
   try{ sessionStorage.removeItem('gdrive_token'); }catch(e){}
   document.getElementById('app').style.display="none";
   document.getElementById('lock').style.display="flex";
-  document.getElementById('lockForm').style.display="block";
   document.getElementById('lockSpinner').style.display="none";
   document.getElementById('loginPassword').value="";
+  const wrap = document.getElementById('bioBtnWrap');
+  if(localStorage.getItem('moneymika_bio_enabled')==='1'){
+    document.getElementById('lockForm').style.display='none';
+    if(wrap){
+      wrap.style.display='block';
+      wrap.innerHTML =
+        '<button class="btn primary" onclick="unlockWithBiometric()">🔐 Face ID / Empreinte</button>'+
+        '<div style="height:10px;"></div>'+
+        '<button class="btn ghost" onclick="showPasswordFallback()">Utiliser le mot de passe</button>';
+      setTimeout(()=>{ if(localStorage.getItem('moneymika_bio_enabled')==='1') unlockWithBiometric(); }, 300);
+    }
+  } else {
+    document.getElementById('lockForm').style.display="block";
+    if(wrap) wrap.style.display='none';
+  }
 }
 
 // Verrouillage automatique : dès que l'appli est fermée/mise en arrière-plan,
